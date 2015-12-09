@@ -6,7 +6,7 @@ glue code generator to bind Nim and Lua together using Nim's powerful macro
 
 **Features**:
 
-*  bind free proc
+* bind free proc
 * bind proc as lua method
 * bind const
 * bind enum
@@ -23,6 +23,7 @@ glue code generator to bind Nim and Lua together using Nim's powerful macro
 planned features:
 
 * out value or param with reference type
+* complex data types conversion, at least standard container
 * don't know, any ideas?
 
 - - -
