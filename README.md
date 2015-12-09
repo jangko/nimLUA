@@ -1,3 +1,4 @@
+
 # nimLUA
 glue code generator to bind Nim and Lua together using Nim's powerful macro
 
@@ -154,6 +155,18 @@ if you use **GLOBAL** or "GLOBAL" as namespace name, it will have no effect
 operator `->` have same meaning with bindEnum, to rename exported symbol on lua side
 
 ###**3. bindFunction**
+```nimrod
+import nimLUA
+
+proc abc(a, b: int): int =
+  result = a + b
+
+var L = newNimLua()
+L.bindFunction(abc)
+L.bindFunction:
+  abc -> "cba"
+L.bindFunction("alphabet", abc)
+```
 bindFunction more or less behave like bindConst, without namespace, it will bind symbol to global namespace.
 
 overloaded procs will be automatically resolved by their params count and types
@@ -196,7 +209,8 @@ this time, Foo will become object name and also namespace name in lua
 
 "newFoo `->` constructor" have special meaning, it will create constructor on lua side with special name: `new`
 
-operator `->` on non constructor will behave the same as other binder
+operator `->` on non constructor will behave the same as other binder.
+
 overloaded proc will automatically resolved by their params count and types
 
 destructor will be generated automatically
@@ -233,3 +247,4 @@ L.bindFunction:
 ##**HOW TO ACCESS LUA CODE FROM NIM?**
 
 still under development, contributions are welcome
+
