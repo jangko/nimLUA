@@ -1,4 +1,5 @@
 # nimLUA
+# nimLUA
 # glue code generator to bind Nim and Lua together using Nim's powerful macro
 #
 # Copyright (c) 2015 Andri Lim
@@ -731,7 +732,9 @@ proc bindSingleConstructor(n, subject: NimNode, glueProc, procName, subjectName:
   
   var glue = "proc " & glueProc & "(L: PState): cint {.cdecl.} =\n"
   glue.add "  var proxy = cast[ptr luaL_$1Proxy](L.newUserData(sizeof(luaL_$1Proxy)))\n" % [subjectName]
-  
+  #always zeroed the memory if you mix gc code and unmanaged code
+  #otherwise, strange things will happened
+  glue.add "  zeroMem(proxy, sizeof(luaL_$1Proxy))\n" % [subjectName]
   glue.add genOvCallSingle(newProcElem(retType, argList), procName, "", {ovfConstructor})
   glue.add "  GC_ref(proxy.ud)\n"
   glue.add "  L.getMetatable(luaL_$1)\n" % [subjectName]

@@ -28,8 +28,9 @@ planned features:
 
 - - -
 **Current version API**:
-no need to remember complicated API,  the API is simple but powerful
+no need to remember complicated API, the API is simple but powerful
 
+* newNimLua
 * bindEnum
 * bindConst
 * bindFunction
