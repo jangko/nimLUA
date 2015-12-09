@@ -64,6 +64,7 @@ proc test(L: PState, fileName: string) =
   if L.doFile("test" & DirSep & fileName) != 0.cint:
     echo L.toString(-1)
     L.pop(1)
+    doAssert false
   else:
     echo fileName & " .. OK"
   
@@ -76,6 +77,10 @@ type
 proc newFoo(name: string): Foo =
   new(result)
   result.name = name
+
+proc newFoo(a, b: int): Foo =
+  new(result)
+  result.name = $a & $b
   
 proc addv(f: Foo, a, b: int): int =
   result = 2 * (a + b)

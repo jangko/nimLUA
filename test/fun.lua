@@ -30,3 +30,6 @@ print(m)
 
 assert(foo:addv(4,5) == 2 * (4+5))
 print(foo:addv("abc", "nop"))
+
+local mee = Foo.new(3, 8)
+assert(mee:add(1,2) == "here comes the magic: 38: 1 + 2 = 3")
