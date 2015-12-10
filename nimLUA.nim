@@ -22,7 +22,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 #
-# 
+#
 #-------------------------------------
 
 import macros, lua, strutils
@@ -30,10 +30,10 @@ export lua, macros
 
 type
   elemTup = tuple[node: NimNode, name: string, kind: NimNodeKind]
-  
+
   argPair = object
     mName, mType: NimNode
-      
+
   bindFlag = enum
     nlbUseLib
     nlbRegisterObject
@@ -43,20 +43,25 @@ type
   ovProcElem = ref object
     retType: NimNode
     params: seq[argPair]
-  
+
   ovProc = ref object
     numArgs: int
     procs: seq[ovProcElem]
 
   ovList = seq[ovProc]
-  
+
   ovFlag = enum
     ovfUseObject
     ovfUseRet
     ovfConstructor
-    
+
   ovFlags = set[ovFlag]
-  
+
+  nlOptions* = enum
+    nloNone
+    nloDebug
+    nloAddMember
+
 const GLOBAL* = "GLOBAL"
 
 #counter that will be used to generate unique intermediate macro name
@@ -64,9 +69,12 @@ const GLOBAL* = "GLOBAL"
 var
   macroCount {.compileTime.} = 0
   proxyCount {.compileTime.} = 0
+  regsCount  {.compileTime.} = 0
   objectList {.compileTime.} = newSeq[string]()
-  echoGenCode {.compileTime.} = false
+  dtorList   {.compileTime.} = newSeq[string]()
   gContext {.compileTime.} = ""
+  #nlOpts {.compileTime.}: set[nlOptions] = {nloAddMember}
+  nlOpts {.compileTime.} = @["nloAddMember"]
 
 #inside macro, const bool become nnkIntLit, that's why we need use
 #this trick to test for bool type using 'when internalTestForBOOL(n)'
@@ -74,18 +82,42 @@ proc internalTestForBOOL*[T](a: T): bool {.compileTime.} =
   when a is bool: result = true
   else: result = false
 
-#call this with true or false to enable/disable debug mode
-macro nimLuaDebug*(mode: bool): stmt =
-  if mode.kind == nnkSym and $mode == "true":
-    echoGenCode = true
-  else:
-    echoGenCode = false
-  result = newNimNode(nnkStmtList)
+#proc toNLO(n: string): nlOptions {.compileTime.} =
+#  let k = getImpl(bindSym"nlOptions".symbol)[2]
+#  echo k.treeRepr
+#  for i in 1..k.len-1:
+#    if $k[i] == n: return nlOptions(i-1)
+#  result = nloNone
   
+#macro nimLuaOptions*(opt: nlOptions, val: bool): stmt =
+#  if val.kind == nnkSym and $val == "true": nlOpts.incl(toNLO($opt))
+#  else: excl(nlOpts, nloAddMember)
+#  result = newNimNode(nnkStmtList)
+
+proc nloContains(s: string): bool {.compileTime.} =
+  for k in nlOpts:
+    if k == s: return true
+  result = false
+  
+proc nloExclude(s: string) {.compileTime.} =
+  if nloContains(s):
+    var tmp = newSeq[string]()
+    for k in nlOpts:
+      if k != s: tmp.add(k)
+    nlOpts = tmp
+      
+proc nloInclude(s: string) {.compileTime.} =
+  if not nloContains(s): nlOpts.add(s)
+    
+macro nimLuaOptions*(opt: nlOptions, val: bool): stmt =
+  if val.kind == nnkSym and $val == "true": nloInclude($opt)
+  else: nloExclude($opt)    
+  result = newNimNode(nnkStmtList)
+
 proc parseCode(s: string): NimNode {.compileTime.} =
   result = parseStmt(s)
-  if echoGenCode:
-    echo s
+  #if nloDebug in nlOpts: echo s
+  if nloContains("nloDebug"): echo s
 
 #split something like 'ident -> "newName"' into tuple
 proc splitElem(n: NimNode): elemTup {.compileTime.} =
@@ -175,20 +207,23 @@ proc genProxyMacro(arg: NimNode, opts: bindFlags, proxyName: string): NimNode {.
   var nlb = "macro " & macroName & "(): stmt =\n"
   if registerObject:
     nlb.add "  let objSym = bindSym\"$1\"\n" % [objectName]
-  nlb.add "  let elemList = [\n"
 
-  var i = 0
-  for k in elemList:
-    let comma = if i < elemList.len-1: "," else: ""
-    nlb.add "    (bindSym\"$1\", \"$2\", $3)$4\n" % [$k.node, k.name, $k.kind, comma]
-    inc i
-
-  nlb.add "  ]\n"
+  var elemIdent = "elemList"
+  if elemList.len > 0:
+    nlb.add "  let elemList = [\n"
+    var i = 0
+    for k in elemList:
+      let comma = if i < elemList.len-1: "," else: ""
+      nlb.add "    (bindSym\"$1\", \"$2\", $3)$4\n" % [$k.node, k.name, $k.kind, comma]
+      inc i
+    nlb.add "  ]\n"
+  else:
+    elemIdent = "[]"
 
   if registerObject:
-    nlb.add "  result = bind$1Impl(\"$2\", objSym, elemList)\n" % [proxyName, luaCtx]
+    nlb.add "  result = bind$1Impl(\"$2\", objSym, $3)\n" % [proxyName, luaCtx, elemIdent]
   else:
-    nlb.add "  result = bind$1Impl(\"$2\", $3 elemList)\n" % [proxyName, luaCtx, libName]
+    nlb.add "  result = bind$1Impl(\"$2\", $3 $4)\n" % [proxyName, luaCtx, libName, elemIdent]
 
   nlb.add macroName & "()\n"
   result = parseCode(nlb)
@@ -203,13 +238,13 @@ proc paramsToArgList(params: NimNode): seq[argPair] {.compileTime.} =
     for j in 0..arg.len-3:
       argList.add(argPair(mName: arg[j], mType: mType))
   result = argList
-  
+
 #proc params and return type
 proc newProcElem(retType: NimNode, params: seq[argPair]): ovProcElem {.compileTime.} =
   result = new(ovProcElem)
   result.retType = retType
   result.params = params
-  
+
 #list of overloaded proc
 proc newOvProc(retType: NimNode, params: seq[argPair]): ovProc {.compileTime.} =
   var ovp = new(ovProc)
@@ -217,7 +252,7 @@ proc newOvProc(retType: NimNode, params: seq[argPair]): ovProc {.compileTime.} =
   ovp.procs = newSeq[ovProcElem]()
   ovp.procs.add newProcElem(retType, params)
   result = ovp
-    
+
 #add overloaded proc into ovList
 proc addOvProc(ovl: var ovList, retType: NimNode, params: seq[argPair]) {.compileTime.} =
   var found = false
@@ -226,33 +261,57 @@ proc addOvProc(ovl: var ovList, retType: NimNode, params: seq[argPair]) {.compil
       k.procs.add newProcElem(retType, params)
       found = true
       break
-      
+
   if not found:
     ovl.add newOvProc(retType, params)
-    
+
 proc isRefType(s: NimNode): bool {.compileTime.} =
   let n = getImpl(s.symbol)
   if n.kind != nnkTypeDef: return false
   if n[2].kind != nnkRefTy: return false
   result = true
-  
+
 proc registerObject(subject: NimNode): string {.compileTime.} =
   let name = $subject
   for i in 0..objectList.high:
     if objectList[i] == name:
       return name & $i
-  
-  let subjectName = name & $objectList.len  
+
+  let subjectName = name & $objectList.len
   objectList.add name
   var glue = "const\n"
   glue.add "  luaL_$1 = \"luaL_$1\"\n" % [subjectName]
   glue.add "type\n"
   glue.add "  luaL_$1Proxy = object\n" % [subjectName]
   glue.add "    ud: $1\n" % [name]
-  glue.add "proc check$1(L: PState, n: int): ptr luaL_$1Proxy =\n" % [subjectName]
-  glue.add "  result = cast[ptr luaL_$1Proxy](L.checkUData(n.cint, luaL_$1))\n" % [subjectName]
   gContext.add glue
   result = subjectName
+
+proc checkUD(s, n: string): string {.compileTime.} =
+  result = "cast[ptr luaL_$1Proxy](L.checkUData($2.cint, luaL_$1))\n" % [s, n]
+
+proc newUD(s: string): string {.compileTime.} =
+  result = "cast[ptr luaL_$1Proxy](L.newUserData(sizeof(luaL_$1Proxy)))\n" % [s]
+
+proc hasDestructor(s: NimNode): bool {.compileTime.} =
+  let name = $s
+  for n in dtorList:
+    if n == name: return true
+  result = false
+
+proc setDestructor(s: NimNode) {.compileTime.} =
+  dtorList.add($s)
+
+proc addMemberCap(SL, libName: string, argLen: int): string {.compileTime.} =
+  #if nloAddMember in nlOpts:
+  if nloContains("nloAddMember"):
+    var glue = "$1.getGlobal(\"$2\")\n" % [SL, libName]
+    glue.add "if not $1.isTable(1):\n" % [SL]
+    glue.add "  $1.pop(1)\n" % [SL]
+    glue.add "  $1.createTable(0.cint, $2.cint)\n" % [SL, $(argLen)]
+    return glue
+  else:
+    result = "$1.createTable(0.cint, $2.cint)\n" % [SL, $(argLen)]
     
 proc nimLuaPanic(L: PState): cint {.cdecl.} =
   echo "panic"
@@ -395,9 +454,17 @@ proc constructBasicArg(mType: NimNode, i: int): string {.compileTime.} =
   result = ""
 
 proc constructComplexArg(mType: NimNode, i: int): string {.compileTime.} =
+  if mType.kind == nnkSym:
+    let nType = getType(mType)
+    if nType.kind in {nnkObjectTy, nnkRefTy}:
+      return checkUD(registerObject(mType), $i)
 
+  if mType.kind == nnkVarTy:
+    if getType(mType[0]).kind in {nnkObjectTy, nnkRefTy}:
+      return checkUD(registerObject(mType[0]), $i)
+
+  echo "AA:" , mType.treeRepr
   error("unknown param type: " & $mType.kind)
-
   result = ""
 
 proc constructBasicRet(mType: NimNode, procCall: string): string {.compileTime.} =
@@ -425,9 +492,28 @@ proc constructBasicRet(mType: NimNode, procCall: string): string {.compileTime.}
   result = ""
 
 proc constructComplexRet(mType: NimNode, procCall: string): string {.compileTime.} =
+  if mType.kind == nnkSym:
+    let nType = getType(mType)
+    if nType.kind in {nnkObjectTy, nnkRefTy}:
+      let subjectName = registerObject(mType)
+      var glue = "  var proxy = " & newUD(subjectName)
+      glue.add "  proxy.ud = $1\n" % [procCall]
+      if isRefType(mType): glue.add "  GC_ref(proxy.ud)\n"
+      glue.add "  L.getMetatable(luaL_$1)\n" % [subjectName]
+      glue.add "  discard L.setMetatable(-2)\n"
+      return glue
 
+  if mType.kind == nnkVarTy:
+    if getType(mType[0]).kind in {nnkObjectTy, nnkRefTy}:
+      let subjectName = registerObject(mType)
+      var glue = "  var proxy = " & newUD(subjectName)
+      glue.add "  proxy.ud = $1\n" % [procCall]
+      glue.add "  L.getMetatable(luaL_$1)\n" % [subjectName]
+      glue.add "  discard L.setMetatable(-2)\n"
+      return glue
+
+  echo mType.treeRepr
   error("unknown ret type: " & $mType.kind)
-
   result = ""
 
 proc constructArg(mName, mType: NimNode, i: int): string {.compileTime.} =
@@ -436,8 +522,7 @@ proc constructArg(mName, mType: NimNode, i: int): string {.compileTime.} =
     result = constructBasicArg(mType, i)
     if result == "": result = constructComplexArg(mType, i)
   else:
-    echo mType.treeRepr
-    error("unsupported param type: " & $mType.kind)
+    result = constructComplexArg(mType, i)
 
 proc constructRet(retType: NimNode, procCall: string): string {.compileTime.} =
   case retType.kind:
@@ -448,21 +533,33 @@ proc constructRet(retType: NimNode, procCall: string): string {.compileTime.} =
     echo retType.treeRepr
     error("unsupported return type: " & $retType.kind)
 
+proc argAttr(mType: NimNode): string {.compileTime.} =
+  if mType.kind == nnkSym:
+    let nType = getType(mType)
+    if nType.kind in {nnkObjectTy, nnkRefTy}:
+      return ".ud"
+
+  if mType.kind == nnkVarTy:
+    if getType(mType[0]).kind in {nnkObjectTy, nnkRefTy}:
+      return ".ud"
+
+  result = ""
+
 proc genOvCallSingle(ovp: ovProcElem, procName, indent: string, flags: ovFlags): string {.compileTime.} =
   var glueParam = ""
   var glue = ""
   let start = if ovfUseObject in flags: 1 else: 0
-  
+
   for i in start..ovp.params.len-1:
     let param = ovp.params[i]
     glue.add indent & "  let arg" & $i & " = " & constructArg(param.mName, param.mType, i + 1)
-    glueParam.add "arg" & $i
+    glueParam.add "arg" & $i & argAttr(param.mType)
     if i < ovp.params.len-1: glueParam.add ", "
 
   if ovfConstructor in flags:
     let procCall = procName & "(" & glueParam & ")"
     glue.add indent & "  proxy.ud = " & procCall & "\n"
-  else:  
+  else:
     let procCall = if ovfUseObject in flags:
         "proxy.ud.$1($2)" % [procName, glueParam]
       else:
@@ -477,7 +574,7 @@ proc genOvCallSingle(ovp: ovProcElem, procName, indent: string, flags: ovFlags):
         glue.add indent & "  return 1\n"
 
   result = glue
-  
+
 proc bindSingleFunction(n: NimNode, glueProc, procName: string): string {.compileTime.} =
   if n.kind != nnkProcDef:
     error("bindFunction: " & procName & " is not a proc")
@@ -485,12 +582,12 @@ proc bindSingleFunction(n: NimNode, glueProc, procName: string): string {.compil
   let params = n[3]
   let retType = params[0]
   let argList = paramsToArgList(params)
-  
+
   var glue = "proc " & glueProc & "(L: PState): cint {.cdecl.} =\n"
   glue.add genOvCallSingle(newProcElem(retType, argList), procName, "", {ovfUseRet})
-  
+
   result = glue
-    
+
 proc genBasicCheck(mType: NimNode, i: int): string {.compileTime.} =
   let argType = $mType
   for c in intTypes:
@@ -519,7 +616,7 @@ proc genComplexCheck(mType: NimNode, i: int): string {.compileTime.} =
   echo mType.treeRepr
   error("genComplexCheck: unknown param type: " & $mType.kind)
   result = ""
-  
+
 proc genCheckType(mName, mType: NimNode, i: int): string {.compileTime.} =
   case mType.kind:
   of nnkSym:
@@ -528,7 +625,7 @@ proc genCheckType(mName, mType: NimNode, i: int): string {.compileTime.} =
   else:
     error("genCheckType: unsupported param type: " & $mType.kind)
     echo mType.treeRepr
-    
+
 #second level of ov proc resolution
 proc genCheck(params: seq[argPair], flags: ovFlags): string {.compileTime.} =
   var glue = "    if "
@@ -540,7 +637,7 @@ proc genCheck(params: seq[argPair], flags: ovFlags): string {.compileTime.} =
     else:
       glue.add ":\n"
   result = glue
-  
+
 #overloaded proc need to be resolved by their params count and params type
 #genCheck generate code to check params type
 proc genOvCallMany(ovp: seq[ovProcElem], procName: string, flags: ovFlags): string {.compileTime.} =
@@ -555,15 +652,15 @@ proc genOvCall(ovp: seq[ovProc], procName: string, flags: ovFlags): string {.com
   var glue = "  let numArgs = L.getTop().int$1\n" % [constructorMatter]
   for k in ovp:
     glue.add "  if numArgs == $1:\n" % [$k.numArgs] #first level of ov proc resolution
-    if k.procs.len == 1: 
+    if k.procs.len == 1:
       glue.add genOvCallSingle(k.procs[0], procName, "  ", flags)
-    else: 
+    else:
       glue.add genOvCallMany(k.procs, procName, flags)
   result = glue
 
 proc bindOverloadedFunction(ov: NimNode, glueProc, procName: string): string {.compileTime.} =
   var ovl = newSeq[ovProc]()
-  
+
   for s in children(ov):
     let n = getImpl(s.symbol)
     if n.kind != nnkProcDef:
@@ -573,7 +670,7 @@ proc bindOverloadedFunction(ov: NimNode, glueProc, procName: string): string {.c
     let retType = params[0]
     let argList = paramsToArgList(params)
     ovl.addOvProc(retType, argList)
-  
+
   var glue = "proc " & glueProc & "(L: PState): cint {.cdecl.} =\n"
   glue.add genOvCall(ovl, procName, {ovfUseRet})
   glue.add "  discard L.error(\"$1: invalid param count\")\n" % [procName]
@@ -594,8 +691,8 @@ proc bindFuncImpl*(SL, libName: string, arg: openArray[elemTup]): NimNode {.comp
   gContext.setLen 0
   var glue = ""
   if exportLib:
-    glue.add SL & ".createTable(0.cint, " & $(arg.len) & ".cint)\n"
-
+    glue.add addMemberCap(SL, libName, arg.len)
+    
   for i in 0..arg.len-1:
     let n = arg[i]
     if n.node.kind notin {nnkSym, nnkClosedSymChoice}:
@@ -622,7 +719,7 @@ proc bindFuncImpl*(SL, libName: string, arg: openArray[elemTup]): NimNode {.comp
     inc proxyCount
 
   if exportLib:
-    glue.add SL & ".setGlobal(\"" & libName & "\")"
+    glue.add SL & ".setGlobal(\"" & libName & "\")\n"
 
   result = parseCode(gContext & glue)
 
@@ -718,7 +815,7 @@ proc bindConstImpl*(SL, libName: string, arg: openArray[elemTup]): NimNode {.com
 
   var glue = ""
   if exportLib:
-    glue.add SL & ".createTable(0.cint, " & $(arg.len) & ".cint)\n"
+    glue.add addMemberCap(SL, libName, arg.len)
 
   for i in 0..arg.len-1:
     let n = arg[i]
@@ -746,7 +843,7 @@ macro bindConst*(arg: varargs[untyped]): stmt =
 # -----------------------------------------------------------------------
 # ----------------------------- bindObject ------------------------------
 # -----------------------------------------------------------------------
-  
+
 proc bindSingleConstructor(n, subject: NimNode, glueProc, procName, subjectName: string): string {.compileTime.} =
   if n.kind != nnkProcDef:
     error("bindFunction: " & procName & " is not a proc")
@@ -755,12 +852,12 @@ proc bindSingleConstructor(n, subject: NimNode, glueProc, procName, subjectName:
   let retType = params[0]
 
   if subject.kind != retType.kind and $subject != $retType:
-    error("object method need object type as first param")
-    
+    error("invalid constructor ret type")
+
   let argList = paramsToArgList(params)
-  
+
   var glue = "proc " & glueProc & "(L: PState): cint {.cdecl.} =\n"
-  glue.add "  var proxy = cast[ptr luaL_$1Proxy](L.newUserData(sizeof(luaL_$1Proxy)))\n" % [subjectName]
+  glue.add "  var proxy = " & newUD(subjectName)
   #always zeroed the memory if you mix gc code and unmanaged code
   #otherwise, strange things will happened
   if isRefType(subject): glue.add "  zeroMem(proxy, sizeof(luaL_$1Proxy))\n" % [subjectName]
@@ -770,15 +867,15 @@ proc bindSingleConstructor(n, subject: NimNode, glueProc, procName, subjectName:
   glue.add "  discard L.setMetatable(-2)\n"
   glue.add "  result = 1\n"
   result = glue
-  
+
 proc eqType(a, b: NimNode): bool {.compileTime.} =
   if a.kind == nnkSym and b.kind == nnkVarTy:
     if sameType(a, b[0]): return true
   result = sameType(a, b)
-  
+
 proc bindOverloadedConstructor(ov, subject: NimNode, glueProc, procName, subjectName: string): string {.compileTime.} =
   var ovl = newSeq[ovProc]()
-  
+
   for s in children(ov):
     let n = getImpl(s.symbol)
     if n.kind != nnkProcDef:
@@ -803,7 +900,7 @@ proc bindOverloadedConstructor(ov, subject: NimNode, glueProc, procName, subject
   glue.add "  discard L.setMetatable(-2)\n"
   glue.add "  result = 1\n"
   result = glue
-    
+
 proc bindObjectSingleMethod(n, subject: NimNode, glueProc, procName, subjectName: string): string {.compileTime.} =
   if n.kind != nnkProcDef:
     error("bindFunction: " & procName & " is not a proc")
@@ -811,21 +908,26 @@ proc bindObjectSingleMethod(n, subject: NimNode, glueProc, procName, subjectName
   let params = n[3]
   let retType = params[0]
   let argList = paramsToArgList(params)
-  
+
+  if eqType(subject, retType):
+    return bindSingleConstructor(n, subject, glueProc, procName, subjectName)
+
   if argList.len == 0:
     error("invalid object method")
-  
+
   if subject.kind != argList[0].mType.kind and not eqType(subject, argList[0].mType):
     error("object method need object type as first param")
-  
+
   var glue = "proc " & glueProc & "(L: PState): cint {.cdecl.} =\n"
-  glue.add "  var proxy = L.check$1(1)\n" % subjectName
+  glue.add "  var proxy = " & checkUD(subjectName, "1")
   glue.add genOvCallSingle(newProcElem(retType, argList), procName, "", {ovfUseObject, ovfUseRet})
   result = glue
-  
+
 proc bindObjectOverloadedMethod(ov, subject: NimNode, glueProc, procName, subjectName: string): string {.compileTime.} =
   var ovl = newSeq[ovProc]()
-  
+  var ovc = newNimNode(nnkClosedSymChoice)
+
+  var glue = ""
   for s in children(ov):
     let n = getImpl(s.symbol)
     if n.kind != nnkProcDef:
@@ -835,24 +937,31 @@ proc bindObjectOverloadedMethod(ov, subject: NimNode, glueProc, procName, subjec
     let retType = params[0]
     let argList = paramsToArgList(params)
 
+    if eqType(subject, retType): #constructor like
+      ovc.add s
+      continue
+
     if argList.len == 0: continue #not a valid object method
     if subject.kind != argList[0].mType.kind and not eqType(subject, argList[0].mType): continue
     ovl.addOvProc(retType, argList)
-  
-  var glue = "proc " & glueProc & "(L: PState): cint {.cdecl.} =\n"
-  glue.add "  var proxy = L.check$1(1)\n" % subjectName
+
+  if ovc.len > 0:
+    glue.add bindOverloadedConstructor(ovc, subject, glueProc, procName, subjectName)
+
+  glue.add "proc " & glueProc & "(L: PState): cint {.cdecl.} =\n"
+  glue.add "  var proxy = " & checkUD(subjectName, "1")
   glue.add genOvCall(ovl, procName, {ovfUseObject, ovfUseRet})
   glue.add "  discard L.error(\"$1: invalid param count\")\n" % [procName]
   glue.add "  return 0\n"
 
   result = glue
-  
+
 proc bindObjectImpl*(SL: string, subject: NimNode, arg: openArray[elemTup]): NimNode {.compileTime.} =
   gContext.setLen 0
   let subjectName = registerObject(subject)
   var glue = "discard $1.newMetatable(luaL_$2)\n" % [SL, subjectName]
-  var regs = "var regs$1 = [\n" % [subjectName]
-  
+  var regs = "var regs$1$2 = [\n" % [subjectName, $regsCount]
+
   for i in 0..arg.len-1:
     let n = arg[i]
     if n.node.kind notin {nnkSym, nnkClosedSymChoice}:
@@ -864,7 +973,7 @@ proc bindObjectImpl*(SL: string, subject: NimNode, arg: openArray[elemTup]): Nim
       exportedName = if n.name == "constructor": "new" else: n.name
 
     regs.add "  luaL_Reg(name: \"$1\", fn: $2),\n" % [exportedName, glueProc]
-        
+
     if n.node.kind == nnkSym:
       if n.name == "constructor":
         glue.add bindSingleConstructor(getImpl(n.node.symbol), subject, glueProc, procName, subjectName)
@@ -875,24 +984,26 @@ proc bindObjectImpl*(SL: string, subject: NimNode, arg: openArray[elemTup]): Nim
         glue.add bindOverloadedConstructor(n.node, subject, glueProc, procName, subjectName)
       else:
         glue.add bindObjectOverloadedMethod(n.node, subject, glueProc, procName, subjectName)
-    
+
     inc proxyCount
-    
-  if isRefType(subject):
+
+  if isRefType(subject) and not hasDestructor(subject):
     glue.add "proc $1_destructor(L: PState): cint {.cdecl.} =\n" % [subjectName]
-    glue.add "  var proxy = L.check$1(1)\n" % [subjectName]
+    glue.add "  var proxy = " & checkUD(subjectName, "1")
     glue.add "  GC_unref(proxy.ud)\n"
     regs.add "  luaL_Reg(name: \"__gc\", fn: $1_destructor),\n" % [subjectName]
-   
+    setDestructor(subject)
+
   regs.add "  luaL_Reg(name: nil, fn: nil)\n"
   regs.add "]\n"
-  
+
   glue.add regs
-  glue.add "$1.setFuncs(cast[ptr luaL_reg](addr(regs$2)), 0)\n" % [SL, subjectName]
+  glue.add "$1.setFuncs(cast[ptr luaL_reg](addr(regs$2$3)), 0)\n" % [SL, subjectName, $regsCount]
   glue.add "$1.pushValue(-1)\n" % [SL]
   glue.add "$1.setField(-1, \"__index\")\n" % [SL]
   glue.add "$1.setGlobal(\"$2\")\n" % [SL, $subject]
 
+  inc regsCount
   result = parseCode(gContext & glue)
 
 macro bindObject*(arg: varargs[untyped]): stmt =

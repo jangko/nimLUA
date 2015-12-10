@@ -17,13 +17,15 @@ glue code generator to bind Nim and Lua together using Nim's powerful macro
 * consistent simple API
 * can rename exported symbol
 * support automatic type conversion
+* can change binding dynamically at runtime too
 * generate clean and optimized glue code that you can inspect at compile time
 * it's free
 
-planned features:
+**planned features**:
 
 * out value or param with reference type
 * complex data types conversion, at least standard container
+* properties getter/setter
 * don't know, any ideas?
 
 - - -
@@ -33,7 +35,7 @@ no need to remember complicated API, the API is simple but powerful
 * newNimLua
 * bindEnum
 * bindConst
-* bindFunction
+* bindFunction/bindProc
 * bindObject
 
 - - -
@@ -156,7 +158,10 @@ if you use **GLOBAL** or "GLOBAL" as namespace name, it will have no effect
 
 operator `->` have same meaning with bindEnum, to rename exported symbol on lua side
 
-###**3. bindFunction**
+###**3. bindFunction/bindProc**
+
+bindFunction is an alias to bindProc, they behave identically
+
 ```nimrod
 import nimLUA
 
@@ -230,17 +235,36 @@ assert(foo:addv(4,5) == 2 * (4+5))
 print(foo:addv("abc", "nop"))
 ```
 
+both **bindObject** and **bindFunction** and **bindConst** can add member to existing namespace
+
+if you want to turn off this functionality, call nimLuaOptions(nloAddMember, false)
+
+```nimrod
+L.bindObject(Foo): #namespace creation
+  newFoo -> constructor
+  
+L.bindObject(Foo): #add new member
+  addv
+  addk -> "add"
+  
+L.bindFunction("gem"): #namespace "gem" creation
+  mining
+  
+L.bindFunction("gem"): #add 'polish' member
+  polish
+```
+
 ##**HOW TO DEBUG**
 
 you can call **nimLuaDebug** with **true/false** parameter
 
 ```nimrod
-nimLuaDebug(true) #turn on debug
+nimLuaOptions(nloDebug, true) #turn on debug
 L.bindEnum:
   GENE
   SUBATOM
   
-nimLuaDebug(false) #turn off debug mode
+nimLuaOptions(nloDebug, false) #turn off debug mode
 L.bindFunction:
   machine
   engine
