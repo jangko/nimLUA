@@ -18,3 +18,8 @@ assert(f:fry() == "fry 15")
 print(gem.mining())
 print(gem.polish())
 print("ANODE " .. gem.ANODE)
+
+
+local k = kakap.new(16)
+assert(k:grill() == "grill 16")
+assert(k:fry() == "fry 16")

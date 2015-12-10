@@ -1,5 +1,4 @@
 # nimLUA
-# nimLUA
 # glue code generator to bind Nim and Lua together using Nim's powerful macro
 #
 # Copyright (c) 2015 Andri Lim
@@ -164,6 +163,7 @@ proc genProxyMacro(arg: NimNode, opts: bindFlags, proxyName: string): NimNode {.
     luaCtx   = ""
     libName  = ""
     objectName = ""
+    objectNewName = ""
     elemList = newSeq[elemTup]()
 
   for i in 0..arg.len-1:
@@ -172,16 +172,16 @@ proc genProxyMacro(arg: NimNode, opts: bindFlags, proxyName: string): NimNode {.
     of nnkSym:
       if i == 0: luaCtx = $n
       else:
-        echo arg.treeRepr
-        error("param " & $i & " must be an identifier, not symbol")
+        error("param " & $i & " must be an identifier, not symbol\n" & arg.treeRepr)
     of nnkStrLit:
       if i == 1 and useLib: libName = n.strVal
       else:
-        echo arg.treeRepr
-        error("param " & $i & " must be an identifier, not string literal")
+        error("param " & $i & " must be an identifier, not string literal\n" & arg.treeRepr)
     of nnkIdent:
       if i == 1 and $n == "GLOBAL" and useLib: libName = $n
-      elif i == 1 and registerObject: objectName = $n
+      elif i == 1 and registerObject: 
+        objectName = $n
+        objectNewName = $n
       else:
         let elem = (node: n, name: $n, kind: n.kind)
         elemList.add elem
@@ -189,12 +189,16 @@ proc genProxyMacro(arg: NimNode, opts: bindFlags, proxyName: string): NimNode {.
       let elem = (node: n[0], name: "`" & $n[0] & "`", kind: n.kind)
       elemList.add elem
     of nnkInfix:
-      elemList.add splitElem(n)
+      if registerObject and i == 1:
+        let k = splitElem(n)
+        objectName = $k.node
+        objectNewName = k.name
+      else:
+        elemList.add splitElem(n)
     of nnkStmtList:
       unwindList(n, elemList)
     else:
-      echo n.treeRepr
-      error("wrong param type")
+      error("wrong param type\n" & n.treeRepr)
 
   if luaCtx == "":
     error("need luaState as first param")
@@ -221,7 +225,7 @@ proc genProxyMacro(arg: NimNode, opts: bindFlags, proxyName: string): NimNode {.
     elemIdent = "[]"
 
   if registerObject:
-    nlb.add "  result = bind$1Impl(\"$2\", objSym, $3)\n" % [proxyName, luaCtx, elemIdent]
+    nlb.add "  result = bind$1Impl(\"$2\", \"$3\", objSym, $4)\n" % [proxyName, luaCtx, objectNewName, elemIdent]
   else:
     nlb.add "  result = bind$1Impl(\"$2\", $3 $4)\n" % [proxyName, luaCtx, libName, elemIdent]
 
@@ -453,6 +457,32 @@ proc constructBasicArg(mType: NimNode, i: int): string {.compileTime.} =
 
   result = ""
 
+proc constructBasicRet(mType: NimNode, arg, indent: string): string {.compileTime.} =
+  let retType = $mType
+  for c in intTypes:
+    if c == retType:
+      return indent & "L.pushInteger(lua_Integer(" & arg & "))\n"
+
+  for c in floatTypes:
+    if c == retType:
+      return indent & "L.pushNumber(lua_Number(" & arg & "))\n"
+
+  if retType == "string":
+    return indent & "discard L.pushLiteral(" & arg & ")\n"
+
+  if retType == "cstring":
+    return indent & "discard L.pushString(" & arg & ")\n"
+
+  if retType == "bool":
+    return indent & "L.pushBoolean(" & arg & ".cint)\n"
+
+  if retType == "char":
+    return indent & "L.pushInteger(lua_Integer(" & arg & ")).chr\n"
+
+  result = ""
+
+var outValueList {.compileTime.}: seq[string]
+
 proc constructComplexArg(mType: NimNode, i: int): string {.compileTime.} =
   if mType.kind == nnkSym:
     let nType = getType(mType)
@@ -460,35 +490,14 @@ proc constructComplexArg(mType: NimNode, i: int): string {.compileTime.} =
       return checkUD(registerObject(mType), $i)
 
   if mType.kind == nnkVarTy:
-    if getType(mType[0]).kind in {nnkObjectTy, nnkRefTy}:
+    let nType = getType(mType[0])
+    if nType.kind in {nnkObjectTy, nnkRefTy}:
       return checkUD(registerObject(mType[0]), $i)
-
-  echo "AA:" , mType.treeRepr
-  error("unknown param type: " & $mType.kind)
-  result = ""
-
-proc constructBasicRet(mType: NimNode, procCall: string): string {.compileTime.} =
-  let retType = $mType
-  for c in intTypes:
-    if c == retType:
-      return "  L.pushInteger(lua_Integer(" & procCall & "))\n"
-
-  for c in floatTypes:
-    if c == retType:
-      return "  L.pushNumber(lua_Number(" & procCall & "))\n"
-
-  if retType == "string":
-    return "  discard L.pushLiteral(" & procCall & ")\n"
-
-  if retType == "cstring":
-    return "  L.pushString(" & procCall & ")\n"
-
-  if retType == "bool":
-    return "  L.pushBoolean(" & procCall & ".cint)\n"
-
-  if retType == "char":
-    return "  L.pushInteger(lua_Integer(" & procCall & ")).chr\n"
-
+    if nType.kind == nnkSym:
+      outValueList.add constructBasicRet(nType, "arg" & $(i-1), "")
+      return constructBasicArg(nType, i)
+              
+  error("unknown param type: " & $mType.kind & "\n" & mType.treeRepr)
   result = ""
 
 proc constructComplexRet(mType: NimNode, procCall: string): string {.compileTime.} =
@@ -512,8 +521,7 @@ proc constructComplexRet(mType: NimNode, procCall: string): string {.compileTime
       glue.add "  discard L.setMetatable(-2)\n"
       return glue
 
-  echo mType.treeRepr
-  error("unknown ret type: " & $mType.kind)
+  error("unknown ret type: " & $mType.kind & "\n" & mType.treeRepr)
   result = ""
 
 proc constructArg(mName, mType: NimNode, i: int): string {.compileTime.} =
@@ -527,11 +535,10 @@ proc constructArg(mName, mType: NimNode, i: int): string {.compileTime.} =
 proc constructRet(retType: NimNode, procCall: string): string {.compileTime.} =
   case retType.kind:
   of nnkSym:
-    result = constructBasicRet(retType, procCall)
+    result = constructBasicRet(retType, procCall, "  ")
     if result == "": result = constructComplexRet(retType, procCall)
   else:
-    echo retType.treeRepr
-    error("unsupported return type: " & $retType.kind)
+    error("unsupported return type: " & $retType.kind & "\n" & retType.treeRepr)
 
 proc argAttr(mType: NimNode): string {.compileTime.} =
   if mType.kind == nnkSym:
@@ -549,10 +556,11 @@ proc genOvCallSingle(ovp: ovProcElem, procName, indent: string, flags: ovFlags):
   var glueParam = ""
   var glue = ""
   let start = if ovfUseObject in flags: 1 else: 0
+  outValueList = @[]
 
   for i in start..ovp.params.len-1:
     let param = ovp.params[i]
-    glue.add indent & "  let arg" & $i & " = " & constructArg(param.mName, param.mType, i + 1)
+    glue.add indent & "  var arg" & $i & " = " & constructArg(param.mName, param.mType, i + 1)
     glueParam.add "arg" & $i & argAttr(param.mType)
     if i < ovp.params.len-1: glueParam.add ", "
 
@@ -566,13 +574,18 @@ proc genOvCallSingle(ovp: ovProcElem, procName, indent: string, flags: ovFlags):
         procName & "(" & glueParam & ")"
 
     if ovfUseRet in flags:
+      var numRet = 0
       if ovp.retType.kind == nnkEmpty:
-        glue.add indent & "  " & procCall & "\n"
-        glue.add indent & "  return 0\n"
+        glue.add indent & "  " & procCall & "\n"        
       else:
         glue.add indent & constructRet(ovp.retType, procCall)
-        glue.add indent & "  return 1\n"
+        numRet = 1
 
+      inc(numRet, outValueList.len)
+      for s in outValueList:
+        glue.add "$1  $2" % [indent, s]
+        
+      glue.add "$1  return $2\n" % [indent, $numRet]
   result = glue
 
 proc bindSingleFunction(n: NimNode, glueProc, procName: string): string {.compileTime.} =
@@ -613,8 +626,11 @@ proc genBasicCheck(mType: NimNode, i: int): string {.compileTime.} =
   result = ""
 
 proc genComplexCheck(mType: NimNode, i: int): string {.compileTime.} =
-  echo mType.treeRepr
-  error("genComplexCheck: unknown param type: " & $mType.kind)
+  if mType.kind == nnkVarTy:
+    if getType(mType[0]).kind == nnkSym:
+      return genBasicCheck(mType[0], i)
+      
+  error("genComplexCheck: unknown param type: " & $mType.kind & "\n" & mType.treeRepr)
   result = ""
 
 proc genCheckType(mName, mType: NimNode, i: int): string {.compileTime.} =
@@ -623,8 +639,7 @@ proc genCheckType(mName, mType: NimNode, i: int): string {.compileTime.} =
     result = genBasicCheck(mType, i)
     if result == "": result = genComplexCheck(mType, i)
   else:
-    error("genCheckType: unsupported param type: " & $mType.kind)
-    echo mType.treeRepr
+    result = genComplexCheck(mType, i)    
 
 #second level of ov proc resolution
 proc genCheck(params: seq[argPair], flags: ovFlags): string {.compileTime.} =
@@ -956,7 +971,7 @@ proc bindObjectOverloadedMethod(ov, subject: NimNode, glueProc, procName, subjec
 
   result = glue
 
-proc bindObjectImpl*(SL: string, subject: NimNode, arg: openArray[elemTup]): NimNode {.compileTime.} =
+proc bindObjectImpl*(SL, newName: string, subject: NimNode, arg: openArray[elemTup]): NimNode {.compileTime.} =
   gContext.setLen 0
   let subjectName = registerObject(subject)
   var glue = "discard $1.newMetatable(luaL_$2)\n" % [SL, subjectName]
@@ -1001,7 +1016,7 @@ proc bindObjectImpl*(SL: string, subject: NimNode, arg: openArray[elemTup]): Nim
   glue.add "$1.setFuncs(cast[ptr luaL_reg](addr(regs$2$3)), 0)\n" % [SL, subjectName, $regsCount]
   glue.add "$1.pushValue(-1)\n" % [SL]
   glue.add "$1.setField(-1, \"__index\")\n" % [SL]
-  glue.add "$1.setGlobal(\"$2\")\n" % [SL, $subject]
+  glue.add "$1.setGlobal(\"$2\")\n" % [SL, newName]
 
   inc regsCount
   result = parseCode(gContext & glue)

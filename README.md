@@ -1,5 +1,5 @@
 
-# nimLUA
+# nimLua
 glue code generator to bind Nim and Lua together using Nim's powerful macro
 
 - - -
@@ -7,7 +7,7 @@ glue code generator to bind Nim and Lua together using Nim's powerful macro
 **Features**:
 
 * bind free proc
-* bind proc as lua method
+* bind proc as Lua method
 * bind const
 * bind enum
 * bind object
@@ -23,7 +23,6 @@ glue code generator to bind Nim and Lua together using Nim's powerful macro
 
 **planned features**:
 
-* out value or param with reference type
 * complex data types conversion, at least standard container
 * properties getter/setter
 * don't know, any ideas?
@@ -45,7 +44,7 @@ no need to remember complicated API, the API is simple but powerful
 ###**1. bindEnum**
 
 ```nimrod
-import nimLUA, os
+import nimLua, os
 
 type
   FRUIT = enum
@@ -70,9 +69,9 @@ proc main() =
 
 main()
 ```
-and you can access them at lua side like this:
+and you can access them at Lua side like this:
 
-```lua
+```Lua
 assert(FRUIT.APPLE == 0)
 assert(FRUIT.BANANA == 1)
 assert(FRUIT.PEACH == 2)
@@ -106,11 +105,11 @@ or
 ```nimrod
 L.bindEnum(GENE -> "DNA", SUBATOM -> GLOBAL)
 ```
-**GLOBAL** or "GLOBAL" have special meaning, it will not create namespace in lua side but will bind the symbol in lua globalspace
+**GLOBAL** or "GLOBAL" have special meaning, it will not create namespace in Lua side but will bind the symbol in Lua globalspace
 
-now lua side will become:
+now Lua side will become:
 
-```lua
+```Lua
 assert(DNA.ADENINE == 0)
 assert(DNA.CYTOSINE == 1)
 assert(DNA.GUANINE == 2)
@@ -124,7 +123,7 @@ assert(NEUTRON == 2)
 ###**2. bindConst**
 
 ```nimrod
-import nimLUA
+import nimLua
 
 const
   MANGOES = 10.0
@@ -156,14 +155,14 @@ first argument(actually second) to bindConst will become the namespace. Without 
 
 if you use **GLOBAL** or "GLOBAL" as namespace name, it will have no effect
 
-operator `->` have same meaning with bindEnum, to rename exported symbol on lua side
+operator `->` have same meaning with bindEnum, to rename exported symbol on Lua side
 
 ###**3. bindFunction/bindProc**
 
 bindFunction is an alias to bindProc, they behave identically
 
 ```nimrod
-import nimLUA
+import nimLua
 
 proc abc(a, b: int): int =
   result = a + b
@@ -178,12 +177,12 @@ bindFunction more or less behave like bindConst, without namespace, it will bind
 
 overloaded procs will be automatically resolved by their params count and types
 
-operator `->` have same meaning with bindEnum, to rename exported symbol on lua side
+operator `->` have same meaning with bindEnum, to rename exported symbol on Lua side
 
 ###**4. bindObject**
 
 ```nimrod
-import nimLUA
+import nimLua
 
 type
   Foo = ref object
@@ -212,9 +211,9 @@ proc main() =
 
 main()
 ```
-this time, Foo will become object name and also namespace name in lua
+this time, Foo will become object name and also namespace name in Lua
 
-"newFoo `->` constructor" have special meaning, it will create constructor on lua side with special name: `new`
+"newFoo `->` constructor" have special meaning, it will create constructor on Lua side with special name: `new`
 
 operator `->` on non constructor will behave the same as other binder.
 
@@ -222,7 +221,7 @@ overloaded proc will automatically resolved by their params count and types
 
 destructor will be generated automatically
 
-```lua
+```Lua
 local foo = Foo.new("fred")
 local m = foo:add(3, 4)
 
@@ -254,6 +253,30 @@ L.bindFunction("gem"): #add 'polish' member
   polish
 ```
 
+##**PASSING BY REFERENCE**
+
+Lua basic data types cannot be passed by reference, but Nim does
+
+if you have something like this in Nim:
+
+```nimrod
+proc abc(a, b: var int) =
+  a = a + 1
+  b = b + 5
+```
+
+then on Lua side:
+
+```lua
+a = 10
+b = 20
+a, b = abc(a, b)
+assert(a == 11)
+assert(b == 25)
+```
+
+basically, outval will become retval, FIFO ordered
+
 ##**HOW TO DEBUG**
 
 you can call **nimLuaDebug** with **true/false** parameter
@@ -270,7 +293,7 @@ L.bindFunction:
   engine
 ```
 
-##**HOW TO ACCESS LUA CODE FROM NIM?**
+##**HOW TO ACCESS Lua CODE FROM NIM?**
 
 still under development, contributions are welcome
 

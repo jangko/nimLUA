@@ -232,6 +232,11 @@ proc main() =
   L.bindFunction("gem", mining)
   L.bindFunction("gem", polish)
   L.bindConst("gem", ANODE)
+  
+  L.bindObject(Fish -> "kakap"):
+    grill
+    fry
+    
   L.test("regular_object.lua")
 
   L.close()
