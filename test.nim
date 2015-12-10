@@ -103,6 +103,19 @@ proc machine(a: int, b:string): string =
 proc machine(a,b,c:string): string =
   result = a & b & c
 
+type
+  Acid = object
+    len: int
+    
+proc makeAcid(a: int): Acid =
+  result.len = a
+  
+proc setLen(a: var Acid, len: int) =
+  a.len = len
+  
+proc getLen(a: Acid): int = 
+  result = a.len
+
 proc main() =
   var L = newNimLua()
   #nimLuaDebug(true)
@@ -178,6 +191,13 @@ proc main() =
   L.bindFunction("mac"):
     machine
   L.test("ov_func.lua")
+  
+  L.bindObject(Acid):
+    makeAcid -> constructor
+    setLen
+    getLen
+    
+  L.test("regular_object.lua")  
   
   L.close()
   

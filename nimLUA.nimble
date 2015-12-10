@@ -1,6 +1,6 @@
 [Package]
 name          = "nimLUA"
-version       = "0.1.1"
+version       = "0.1.2"
 author        = "Andri Lim"
 description   = "glue code generator to bind Nim and Lua together using Nim's powerful macro"
 license       = "MIT"

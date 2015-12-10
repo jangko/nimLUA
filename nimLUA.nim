@@ -64,8 +64,9 @@ const GLOBAL* = "GLOBAL"
 var
   macroCount {.compileTime.} = 0
   proxyCount {.compileTime.} = 0
-  objectCount {.compileTime.} = 0
+  objectList {.compileTime.} = newSeq[string]()
   echoGenCode {.compileTime.} = false
+  gContext {.compileTime.} = ""
 
 #inside macro, const bool become nnkIntLit, that's why we need use
 #this trick to test for bool type using 'when internalTestForBOOL(n)'
@@ -228,6 +229,30 @@ proc addOvProc(ovl: var ovList, retType: NimNode, params: seq[argPair]) {.compil
       
   if not found:
     ovl.add newOvProc(retType, params)
+    
+proc isRefType(s: NimNode): bool {.compileTime.} =
+  let n = getImpl(s.symbol)
+  if n.kind != nnkTypeDef: return false
+  if n[2].kind != nnkRefTy: return false
+  result = true
+  
+proc registerObject(subject: NimNode): string {.compileTime.} =
+  let name = $subject
+  for i in 0..objectList.high:
+    if objectList[i] == name:
+      return name & $i
+  
+  let subjectName = name & $objectList.len  
+  objectList.add name
+  var glue = "const\n"
+  glue.add "  luaL_$1 = \"luaL_$1\"\n" % [subjectName]
+  glue.add "type\n"
+  glue.add "  luaL_$1Proxy = object\n" % [subjectName]
+  glue.add "    ud: $1\n" % [name]
+  glue.add "proc check$1(L: PState, n: int): ptr luaL_$1Proxy =\n" % [subjectName]
+  glue.add "  result = cast[ptr luaL_$1Proxy](L.checkUData(n.cint, luaL_$1))\n" % [subjectName]
+  gContext.add glue
+  result = subjectName
     
 proc nimLuaPanic(L: PState): cint {.cdecl.} =
   echo "panic"
@@ -439,7 +464,7 @@ proc genOvCallSingle(ovp: ovProcElem, procName, indent: string, flags: ovFlags):
     glue.add indent & "  proxy.ud = " & procCall & "\n"
   else:  
     let procCall = if ovfUseObject in flags:
-        "proxy.$1($2)" % [procName, glueParam]
+        "proxy.ud.$1($2)" % [procName, glueParam]
       else:
         procName & "(" & glueParam & ")"
 
@@ -566,6 +591,7 @@ proc bindFuncImpl*(SL, libName: string, arg: openArray[elemTup]): NimNode {.comp
   let
     exportLib = libName != "" and libName != "GLOBAL"
 
+  gContext.setLen 0
   var glue = ""
   if exportLib:
     glue.add SL & ".createTable(0.cint, " & $(arg.len) & ".cint)\n"
@@ -598,7 +624,7 @@ proc bindFuncImpl*(SL, libName: string, arg: openArray[elemTup]): NimNode {.comp
   if exportLib:
     glue.add SL & ".setGlobal(\"" & libName & "\")"
 
-  result = parseCode(glue)
+  result = parseCode(gContext & glue)
 
 #call this macro with following params pattern:
 # * bindFunction(luaState, "libName", ident1, ident2, .., identN)
@@ -607,6 +633,9 @@ proc bindFuncImpl*(SL, libName: string, arg: openArray[elemTup]): NimNode {.comp
 #     -> export nim function(s) to lua global scope
 
 macro bindFunction*(arg: varargs[untyped]): stmt =
+  result = genProxyMacro(arg, {nlbUSeLib}, "Func")
+
+macro bindProc*(arg: varargs[untyped]): stmt =
   result = genProxyMacro(arg, {nlbUSeLib}, "Func")
 
 # ----------------------------------------------------------------------
@@ -717,7 +746,7 @@ macro bindConst*(arg: varargs[untyped]): stmt =
 # -----------------------------------------------------------------------
 # ----------------------------- bindObject ------------------------------
 # -----------------------------------------------------------------------
-
+  
 proc bindSingleConstructor(n, subject: NimNode, glueProc, procName, subjectName: string): string {.compileTime.} =
   if n.kind != nnkProcDef:
     error("bindFunction: " & procName & " is not a proc")
@@ -734,13 +763,18 @@ proc bindSingleConstructor(n, subject: NimNode, glueProc, procName, subjectName:
   glue.add "  var proxy = cast[ptr luaL_$1Proxy](L.newUserData(sizeof(luaL_$1Proxy)))\n" % [subjectName]
   #always zeroed the memory if you mix gc code and unmanaged code
   #otherwise, strange things will happened
-  glue.add "  zeroMem(proxy, sizeof(luaL_$1Proxy))\n" % [subjectName]
+  if isRefType(subject): glue.add "  zeroMem(proxy, sizeof(luaL_$1Proxy))\n" % [subjectName]
   glue.add genOvCallSingle(newProcElem(retType, argList), procName, "", {ovfConstructor})
-  glue.add "  GC_ref(proxy.ud)\n"
+  if isRefType(subject): glue.add "  GC_ref(proxy.ud)\n"
   glue.add "  L.getMetatable(luaL_$1)\n" % [subjectName]
   glue.add "  discard L.setMetatable(-2)\n"
   glue.add "  result = 1\n"
   result = glue
+  
+proc eqType(a, b: NimNode): bool {.compileTime.} =
+  if a.kind == nnkSym and b.kind == nnkVarTy:
+    if sameType(a, b[0]): return true
+  result = sameType(a, b)
   
 proc bindOverloadedConstructor(ov, subject: NimNode, glueProc, procName, subjectName: string): string {.compileTime.} =
   var ovl = newSeq[ovProc]()
@@ -755,16 +789,16 @@ proc bindOverloadedConstructor(ov, subject: NimNode, glueProc, procName, subject
     let argList = paramsToArgList(params)
 
     #not a valid constructor
-    if subject.kind != retType.kind and not sameType(subject, retType): continue
+    if subject.kind != retType.kind and not eqType(subject, retType): continue
     ovl.addOvProc(retType, argList)
 
   var glue = "proc " & glueProc & "(L: PState): cint {.cdecl.} =\n"
   glue.add "  var proxy = cast[ptr luaL_$1Proxy](L.newUserData(sizeof(luaL_$1Proxy)))\n" % [subjectName]
   #always zeroed the memory if you mix gc code and unmanaged code
   #otherwise, strange things will happened
-  glue.add "  zeroMem(proxy, sizeof(luaL_$1Proxy))\n" % [subjectName]
+  if isRefType(subject): glue.add "  zeroMem(proxy, sizeof(luaL_$1Proxy))\n" % [subjectName]
   glue.add genOvCall(ovl, procName, {ovfConstructor})
-  glue.add "  GC_ref(proxy.ud)\n"
+  if isRefType(subject): glue.add "  GC_ref(proxy.ud)\n"
   glue.add "  L.getMetatable(luaL_$1)\n" % [subjectName]
   glue.add "  discard L.setMetatable(-2)\n"
   glue.add "  result = 1\n"
@@ -781,7 +815,7 @@ proc bindObjectSingleMethod(n, subject: NimNode, glueProc, procName, subjectName
   if argList.len == 0:
     error("invalid object method")
   
-  if subject.kind != argList[0].mType.kind and not sameType(subject, argList[0].mType):
+  if subject.kind != argList[0].mType.kind and not eqType(subject, argList[0].mType):
     error("object method need object type as first param")
   
   var glue = "proc " & glueProc & "(L: PState): cint {.cdecl.} =\n"
@@ -802,7 +836,7 @@ proc bindObjectOverloadedMethod(ov, subject: NimNode, glueProc, procName, subjec
     let argList = paramsToArgList(params)
 
     if argList.len == 0: continue #not a valid object method
-    if subject.kind != argList[0].mType.kind and not sameType(subject, argList[0].mType): continue
+    if subject.kind != argList[0].mType.kind and not eqType(subject, argList[0].mType): continue
     ovl.addOvProc(retType, argList)
   
   var glue = "proc " & glueProc & "(L: PState): cint {.cdecl.} =\n"
@@ -814,16 +848,9 @@ proc bindObjectOverloadedMethod(ov, subject: NimNode, glueProc, procName, subjec
   result = glue
   
 proc bindObjectImpl*(SL: string, subject: NimNode, arg: openArray[elemTup]): NimNode {.compileTime.} =
-  let subjectName = $subject & $objectCount
-  var glue = "const\n"
-  glue.add "  luaL_$1 = \"luaL_$1\"\n" % [subjectName]
-  glue.add "type\n"
-  glue.add "  luaL_$1Proxy = object\n" % [subjectName]
-  glue.add "    ud: $1\n" % [$subject]
-  glue.add "proc check$1(L: PState, n: int): $2 =\n" % [subjectName, $subject]
-  glue.add "  result = cast[ptr luaL_$1Proxy](L.checkUData(n.cint, luaL_$1)).ud\n" % [subjectName]
-  glue.add "discard $1.newMetatable(luaL_$2)\n" % [SL, subjectName]
-
+  gContext.setLen 0
+  let subjectName = registerObject(subject)
+  var glue = "discard $1.newMetatable(luaL_$2)\n" % [SL, subjectName]
   var regs = "var regs$1 = [\n" % [subjectName]
   
   for i in 0..arg.len-1:
@@ -851,11 +878,12 @@ proc bindObjectImpl*(SL: string, subject: NimNode, arg: openArray[elemTup]): Nim
     
     inc proxyCount
     
-  glue.add "proc $1_destructor(L: PState): cint {.cdecl.} =\n" % [subjectName]
-  glue.add "  var proxy = L.check$1(1)\n" % [subjectName]
-  glue.add "  GC_unref(proxy)\n"
-  
-  regs.add "  luaL_Reg(name: \"__gc\", fn: $1_destructor),\n" % [subjectName]
+  if isRefType(subject):
+    glue.add "proc $1_destructor(L: PState): cint {.cdecl.} =\n" % [subjectName]
+    glue.add "  var proxy = L.check$1(1)\n" % [subjectName]
+    glue.add "  GC_unref(proxy.ud)\n"
+    regs.add "  luaL_Reg(name: \"__gc\", fn: $1_destructor),\n" % [subjectName]
+   
   regs.add "  luaL_Reg(name: nil, fn: nil)\n"
   regs.add "]\n"
   
@@ -865,8 +893,7 @@ proc bindObjectImpl*(SL: string, subject: NimNode, arg: openArray[elemTup]): Nim
   glue.add "$1.setField(-1, \"__index\")\n" % [SL]
   glue.add "$1.setGlobal(\"$2\")\n" % [SL, $subject]
 
-  result = parseCode(glue)
+  result = parseCode(gContext & glue)
 
 macro bindObject*(arg: varargs[untyped]): stmt =
   result = genProxyMacro(arg, {nlbRegisterObject}, "Object")
-  inc objectCount
