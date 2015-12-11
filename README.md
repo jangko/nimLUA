@@ -234,9 +234,22 @@ assert(foo:addv(4,5) == 2 * (4+5))
 print(foo:addv("abc", "nop"))
 ```
 
+operator `->` when applied to object, will rename exported symbol on Lua side:
+
+```nimrod
+L.bindObject(Foo -> "cat"):
+  newFoo -> constructor
+```
+
+on Lua side:
+
+```lua
+local c = cat.new("fred") --not 'Foo' anymore
+```
+
 both **bindObject** and **bindFunction** and **bindConst** can add member to existing namespace
 
-if you want to turn off this functionality, call nimLuaOptions(nloAddMember, false)
+if you want to turn off this functionality, call **nimLuaOptions**(nloAddMember, false)
 
 ```nimrod
 L.bindObject(Foo): #namespace creation
@@ -279,7 +292,7 @@ basically, outval will become retval, FIFO ordered
 
 ##**HOW TO DEBUG**
 
-you can call **nimLuaDebug** with **true/false** parameter
+you can call **nimLuaOptions**(nloDebug, true/false)
 
 ```nimrod
 nimLuaOptions(nloDebug, true) #turn on debug
@@ -293,7 +306,7 @@ L.bindFunction:
   engine
 ```
 
-##**HOW TO ACCESS Lua CODE FROM NIM?**
+##**HOW TO ACCESS LUA CODE FROM NIM?**
 
 still under development, contributions are welcome
 
