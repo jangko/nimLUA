@@ -984,6 +984,7 @@ proc bindObjectOverloadedMethod(ov, subject: NimNode, glueProc, procName, subjec
 
   if ovc.len > 0:
     glue.add bindOverloadedConstructor(ovc, subject, glueProc, procName, subjectName)
+    return glue
 
   glue.add "proc " & glueProc & "(L: PState): cint {.cdecl.} =\n"
   glue.add "  var proxy = " & checkUD(subjectName, "1")

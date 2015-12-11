@@ -205,6 +205,8 @@ proc main() =
     addk -> "add"
     setAcid2
     setAcid
+    newFoo
+    newFoo -> "whatever"
 
   L.test("fun.lua")
 

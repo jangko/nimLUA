@@ -33,3 +33,9 @@ print(foo:addv("abc", "nop"))
 
 local mee = Foo.new(3, 8)
 assert(mee:add(1,2) == "here comes the magic: 38: 1 + 2 = 3")
+
+local x = Foo.newFoo("cat")
+print(x:add(1,10))
+
+local y = Foo.whatever("king")
+print(y:add(10,10))
