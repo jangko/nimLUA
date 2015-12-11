@@ -64,7 +64,7 @@ proc test(L: PState, fileName: string) =
   if L.doFile("test" & DirSep & fileName) != 0.cint:
     echo L.toString(-1)
     L.pop(1)
-    doAssert false
+    quit()
   else:
     echo fileName & " .. OK"
 
@@ -103,6 +103,8 @@ proc machine(a: int, b:string): string =
 proc machine(a,b,c:string): string =
   result = a & b & c
 
+proc subb(a,b: int): int = a - b
+
 type
   Acid = object
     len: int
@@ -136,7 +138,6 @@ proc polish(): string = "polishing gem"
 
 proc main() =
   var L = newNimLua()
-  #nimLuaOptions(nloDebug, true)
 
   L.bindEnum(GENE)
   L.test("single_scoped_enum.lua")
@@ -241,6 +242,22 @@ proc main() =
     
   L.test("regular_object.lua")
 
+  L.bindFunction(GLOBAL):
+    mulv
+    
+  L.bindFunction("GLOBAL", mulv, subb)
+    
+  L.bindConst(GLOBAL):
+    LEMON
+    
+  L.bindConst("GLOBAL"):
+    LEMON
+    
+  L.bindEnum:
+    GENE -> GLOBAL
+    FRUIT -> "GLOBAL"
+  
+  L.test("namespace.lua")
   L.close()
 
 main()

@@ -28,7 +28,12 @@ import macros, lua, strutils
 export lua, macros
 
 type
-  elemTup = tuple[node: NimNode, name: string, kind: NimNodeKind]
+  elemTup = tuple[
+    node: NimNode, 
+    name: string, 
+    kind: NimNodeKind, 
+    rhsKind: NimNodeKind
+  ]
 
   argPair = object
     mName, mType: NimNode
@@ -61,8 +66,6 @@ type
     nloDebug
     nloAddMember
 
-const GLOBAL* = "GLOBAL"
-
 #counter that will be used to generate unique intermediate macro name
 #and avoid name collision
 var
@@ -71,9 +74,7 @@ var
   regsCount  {.compileTime.} = 0
   objectList {.compileTime.} = newSeq[string]()
   dtorList   {.compileTime.} = newSeq[string]()
-  gContext {.compileTime.} = ""
-  #nlOpts {.compileTime.}: set[nlOptions] = {nloAddMember}
-  nlOpts {.compileTime.} = @["nloAddMember"]
+  gContext   {.compileTime.} = ""
 
 #inside macro, const bool become nnkIntLit, that's why we need use
 #this trick to test for bool type using 'when internalTestForBOOL(n)'
@@ -81,42 +82,9 @@ proc internalTestForBOOL*[T](a: T): bool {.compileTime.} =
   when a is bool: result = true
   else: result = false
 
-#proc toNLO(n: string): nlOptions {.compileTime.} =
-#  let k = getImpl(bindSym"nlOptions".symbol)[2]
-#  echo k.treeRepr
-#  for i in 1..k.len-1:
-#    if $k[i] == n: return nlOptions(i-1)
-#  result = nloNone
-  
-#macro nimLuaOptions*(opt: nlOptions, val: bool): stmt =
-#  if val.kind == nnkSym and $val == "true": nlOpts.incl(toNLO($opt))
-#  else: excl(nlOpts, nloAddMember)
-#  result = newNimNode(nnkStmtList)
-
-proc nloContains(s: string): bool {.compileTime.} =
-  for k in nlOpts:
-    if k == s: return true
-  result = false
-  
-proc nloExclude(s: string) {.compileTime.} =
-  if nloContains(s):
-    var tmp = newSeq[string]()
-    for k in nlOpts:
-      if k != s: tmp.add(k)
-    nlOpts = tmp
-      
-proc nloInclude(s: string) {.compileTime.} =
-  if not nloContains(s): nlOpts.add(s)
-    
-macro nimLuaOptions*(opt: nlOptions, val: bool): stmt =
-  if val.kind == nnkSym and $val == "true": nloInclude($opt)
-  else: nloExclude($opt)    
-  result = newNimNode(nnkStmtList)
-
 proc parseCode(s: string): NimNode {.compileTime.} =
   result = parseStmt(s)
-  #if nloDebug in nlOpts: echo s
-  if nloContains("nloDebug"): echo s
+  #echo s
 
 #split something like 'ident -> "newName"' into tuple
 proc splitElem(n: NimNode): elemTup {.compileTime.} =
@@ -133,9 +101,9 @@ proc splitElem(n: NimNode): elemTup {.compileTime.} =
     error("alias must be string literal and not " & $rhs.kind)
 
   if lhs.kind == nnkAccQuoted:
-    result = (lhs[0], $rhs, nnkAccQuoted)
+    result = (lhs[0], $rhs, nnkAccQuoted, rhs.kind)
   else:
-    result = (lhs, $rhs, nnkIdent)
+    result = (lhs, $rhs, nnkIdent, rhs.kind)
 
 #helper proc to flatten nnkStmtList
 proc unwindList(arg: NimNode, elemList: var seq[elemTup]) {.compileTime.} =
@@ -143,10 +111,10 @@ proc unwindList(arg: NimNode, elemList: var seq[elemTup]) {.compileTime.} =
     let n = arg[i]
     case n.kind:
     of nnkIdent:
-      let elem = (node: n, name: $n, kind: n.kind)
+      let elem = (node: n, name: $n, kind: n.kind, rhsKind: nnkNone)
       elemList.add elem
     of nnkAccQuoted:
-      let elem = (node: n[0], name: "`" & $n[0] & "`", kind: n.kind)
+      let elem = (node: n[0], name: "`" & $n[0] & "`", kind: n.kind, rhsKind: nnkNone)
       elemList.add elem
     of nnkInfix:
       elemList.add splitElem(n)
@@ -162,6 +130,7 @@ proc genProxyMacro(arg: NimNode, opts: bindFlags, proxyName: string): NimNode {.
   var
     luaCtx   = ""
     libName  = ""
+    libKind: NimNodeKind
     objectName = ""
     objectNewName = ""
     elemList = newSeq[elemTup]()
@@ -174,19 +143,23 @@ proc genProxyMacro(arg: NimNode, opts: bindFlags, proxyName: string): NimNode {.
       else:
         error("param " & $i & " must be an identifier, not symbol\n" & arg.treeRepr)
     of nnkStrLit:
-      if i == 1 and useLib: libName = n.strVal
+      if i == 1 and useLib: 
+        libName = n.strVal
+        libKind = n.kind
       else:
         error("param " & $i & " must be an identifier, not string literal\n" & arg.treeRepr)
     of nnkIdent:
-      if i == 1 and $n == "GLOBAL" and useLib: libName = $n
+      if i == 1 and $n == "GLOBAL" and useLib: 
+        libName = $n
+        libKind = n.kind
       elif i == 1 and registerObject: 
         objectName = $n
         objectNewName = $n
       else:
-        let elem = (node: n, name: $n, kind: n.kind)
+        let elem = (node: n, name: $n, kind: n.kind, rhsKind: nnkNone)
         elemList.add elem
     of nnkAccQuoted:
-      let elem = (node: n[0], name: "`" & $n[0] & "`", kind: n.kind)
+      let elem = (node: n[0], name: "`" & $n[0] & "`", kind: n.kind, rhsKind: nnkNone)
       elemList.add elem
     of nnkInfix:
       if registerObject and i == 1:
@@ -204,7 +177,7 @@ proc genProxyMacro(arg: NimNode, opts: bindFlags, proxyName: string): NimNode {.
     error("need luaState as first param")
 
   if libName != "" or useLib:
-    libName = "\"$1\", " % [libName]
+    libName = "\"$1\", $2, " % [libName, $libKind]
 
   #generate intermediate macro to utilize bindSym that can only accept string literal
   let macroName = "NLB$1$2" % [proxyName, $macroCount]
@@ -218,7 +191,7 @@ proc genProxyMacro(arg: NimNode, opts: bindFlags, proxyName: string): NimNode {.
     var i = 0
     for k in elemList:
       let comma = if i < elemList.len-1: "," else: ""
-      nlb.add "    (bindSym\"$1\", \"$2\", $3)$4\n" % [$k.node, k.name, $k.kind, comma]
+      nlb.add "    (bindSym\"$1\", \"$2\", $3, $4)$5\n" % [$k.node, k.name, $k.kind, $k.rhsKind, comma]
       inc i
     nlb.add "  ]\n"
   else:
@@ -308,10 +281,10 @@ proc setDestructor(s: NimNode) {.compileTime.} =
   dtorList.add($s)
 
 proc addMemberCap(SL, libName: string, argLen: int): string {.compileTime.} =
-  #if nloAddMember in nlOpts:
-  if nloContains("nloAddMember"):
-    var glue = "$1.getGlobal(\"$2\")\n" % [SL, libName]
-    glue.add "if not $1.isTable(1):\n" % [SL]
+  when true:
+    var glue = ""
+    glue.add "$1.getGlobal(\"$2\")\n" % [SL, libName]
+    glue.add "if not $1.isTable(-1):\n" % [SL]
     glue.add "  $1.pop(1)\n" % [SL]
     glue.add "  $1.createTable(0.cint, $2.cint)\n" % [SL, $(argLen)]
     return glue
@@ -320,14 +293,17 @@ proc addMemberCap(SL, libName: string, argLen: int): string {.compileTime.} =
     
 proc nimLuaPanic(L: PState): cint {.cdecl.} =
   echo "panic"
+  echo L.toString(-1)
+  L.pop(1)
+  return 1
 
 #call this before you use this library
-proc newNimLua*(): PState =
+proc newNimLua*(readOnlyEnum = false): PState =
   var L = newState()
   L.openLibs
   discard L.atPanic(nimLuaPanic)
 
-  let code = """
+  let roEnum = """
 function readonlytable(table)
    return setmetatable({}, {
      __index = table,
@@ -336,7 +312,14 @@ function readonlytable(table)
    });
 end
 """
-  discard L.doString(code)
+  let rwEnum = """
+function readonlytable(table)
+   return table
+end
+
+"""
+
+  discard L.doString(if readOnlyEnum: roEnum else: rwEnum)
   result = L
 
 # -------------------------------------------------------------------------
@@ -356,22 +339,24 @@ proc bindEnumScoped(SL: string, s: NimNode, scopeName: string, kind: NimNodeKind
     numEnum = x[2].len - 1
     enumName = if kind == nnkAccQuoted: "`" & $x[0] & "`" else: $x[0]
 
-  result = "$1.getGlobal(\"readonlytable\")\n" % [SL]
-  result.add "$1.createTable(0.cint, cint($2))\n" % [SL, $numEnum]
+  var glue = ""
+  glue.add "$1.getGlobal(\"readonlytable\")\n" % [SL]
+  glue.add addMemberCap(SL, scopeName, numEnum)
 
   for i in 1..numEnum:
     let
       n = x[2][i]
       sym = if n.kind == nnkAccQuoted: "`" & $n[0] & "`" else: $n
-    result.add "discard $1.pushlString(\"$2\", $3)\n" % [SL, sym, $sym.len]
-    result.add "when compiles($1):\n" % [sym]
-    result.add "  $1.pushInteger(lua_Integer($2))\n" % [SL, sym]
-    result.add "else:\n"
-    result.add "  $1.pushInteger(lua_Integer($2.$3))\n" % [SL, enumName, sym]
-    result.add "$1.setTable(-3)\n" % [SL]
+    glue.add "discard $1.pushlString(\"$2\", $3)\n" % [SL, sym, $sym.len]
+    glue.add "when compiles($1):\n" % [sym]
+    glue.add "  $1.pushInteger(lua_Integer($2))\n" % [SL, sym]
+    glue.add "else:\n"
+    glue.add "  $1.pushInteger(lua_Integer($2.$3))\n" % [SL, enumName, sym]
+    glue.add "$1.setTable(-3)\n" % [SL]
 
-  result.add "discard $1.pcall(1, 1, 0)\n" % [SL]
-  result.add "$1.setGlobal(\"$2\")\n" % [SL, scopeName]
+  glue.add "discard $1.pcall(1, 1, 0)\n" % [SL]
+  glue.add "$1.setGlobal(\"$2\")\n" % [SL, scopeName]
+  result = glue
 
 proc bindEnumGlobal(SL: string, s: NimNode, kind: NimNodeKind): string {.compileTime.} =
   let x = getImpl(s.symbol)
@@ -386,24 +371,26 @@ proc bindEnumGlobal(SL: string, s: NimNode, kind: NimNodeKind): string {.compile
     numEnum = x[2].len - 1
     enumName = if kind == nnkAccQuoted: "`" & $x[0] & "`" else: $x[0]
 
-  result = ""
+  var glue = ""
   for i in 1..numEnum:
     let
       n = x[2][i]
       sym = if n.kind == nnkAccQuoted: "`" & $n[0] & "`" else: $n
-    result.add "when compiles($1):\n" % [sym]
-    result.add "  $1.pushInteger(lua_Integer($2))\n" % [SL, sym]
-    result.add "else:\n"
-    result.add "  $1.pushInteger(lua_Integer($2.$3))\n" % [SL, enumName, sym]
-    result.add "$1.setGlobal(\"$2\")\n" % [SL, sym]
-
+    glue.add "when compiles($1):\n" % [sym]
+    glue.add "  $1.pushInteger(lua_Integer($2))\n" % [SL, sym]
+    glue.add "else:\n"
+    glue.add "  $1.pushInteger(lua_Integer($2.$3))\n" % [SL, enumName, sym]
+    glue.add "$1.setGlobal(\"$2\")\n" % [SL, sym]
+  
+  result = glue
+    
 #this proc need to be exported because intermediate macro call this proc from
 #callsite module
 proc bindEnumImpl*(SL: string, arg: openArray[elemTup]): NimNode {.compileTime.} =
   var glue = ""
   for i in 0..arg.len-1:
     let n = arg[i]
-    if n.name == "GLOBAL": glue.add bindEnumGlobal(SL, n.node, n.kind)
+    if n.name == "GLOBAL" and n.rhsKind == nnkIdent: glue.add bindEnumGlobal(SL, n.node, n.kind)
     else: glue.add bindEnumScoped(SL, n.node, n.name, n.kind)
 
   result = parseCode(glue)
@@ -721,9 +708,9 @@ proc getAccQuotedName(n: NimNode, kind: NimNodeKind): string {.compileTime.} =
   if kind == nnkAccQuoted: result = "`" & name & "`" else: result = name
 
 #this proc is exported because of the NLBFunc macro expansion occured on bindFunction caller module
-proc bindFuncImpl*(SL, libName: string, arg: openArray[elemTup]): NimNode {.compileTime.} =
+proc bindFuncImpl*(SL, libName: string, libKind: NimNodeKind, arg: openArray[elemTup]): NimNode {.compileTime.} =
   let
-    exportLib = libName != "" and libName != "GLOBAL"
+    exportLib = libName != "" and libName != "GLOBAL" or (libName == "GLOBAL" and libKind == nnkStrLit)
 
   gContext.setLen 0
   var glue = ""
@@ -757,7 +744,7 @@ proc bindFuncImpl*(SL, libName: string, arg: openArray[elemTup]): NimNode {.comp
 
   if exportLib:
     glue.add SL & ".setGlobal(\"" & libName & "\")\n"
-
+  
   result = parseCode(gContext & glue)
 
 #call this macro with following params pattern:
@@ -846,9 +833,9 @@ proc constructConst(SL: string, n: NimNode, name: string): string {.compileTime.
   echo "A: ", treeRepr(n)
   result = ""
 
-proc bindConstImpl*(SL, libName: string, arg: openArray[elemTup]): NimNode {.compileTime.} =
+proc bindConstImpl*(SL, libName: string, libKind: NimNodeKind, arg: openArray[elemTup]): NimNode {.compileTime.} =
   let
-    exportLib = libName != "" and libName != "GLOBAL"
+    exportLib = libName != "" and libName != "GLOBAL" or (libName == "GLOBAL" and libKind == nnkStrLit)
 
   var glue = ""
   if exportLib:
@@ -870,8 +857,8 @@ proc bindConstImpl*(SL, libName: string, arg: openArray[elemTup]): NimNode {.com
       glue.add SL & ".setGlobal(\"" & exportedName & "\")\n"
 
   if exportLib:
-    glue.add SL & ".setGlobal(\"" & libName & "\")"
-
+    glue.add SL & ".setGlobal(\"" & libName & "\")\n"
+  
   result = parseCode(glue)
 
 macro bindConst*(arg: varargs[untyped]): stmt =
@@ -1013,12 +1000,12 @@ proc bindObjectImpl*(SL, newName: string, subject: NimNode, arg: openArray[elemT
     regs.add "  luaL_Reg(name: \"$1\", fn: $2),\n" % [exportedName, glueProc]
 
     if n.node.kind == nnkSym:
-      if n.name == "constructor":
+      if n.name == "constructor" and n.kind != nnkStrLit:
         glue.add bindSingleConstructor(getImpl(n.node.symbol), subject, glueProc, procName, subjectName)
       else:
         glue.add bindObjectSingleMethod(getImpl(n.node.symbol), subject, glueProc, procName, subjectName)
     else: #nnkClosedSymChoice
-      if n.name == "constructor":
+      if n.name == "constructor" and n.kind != nnkStrLit:
         glue.add bindOverloadedConstructor(n.node, subject, glueProc, procName, subjectName)
       else:
         glue.add bindObjectOverloadedMethod(n.node, subject, glueProc, procName, subjectName)

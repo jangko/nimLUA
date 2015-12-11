@@ -105,7 +105,11 @@ or
 ```nimrod
 L.bindEnum(GENE -> "DNA", SUBATOM -> GLOBAL)
 ```
-**GLOBAL** or "GLOBAL" have special meaning, it will not create namespace in Lua side but will bind the symbol in Lua globalspace
+
+a note on **GLOBAL** and "GLOBAL":
+
+* **GLOBAL** without quote will not create namespace on Lua side but will bind the symbol in Lua globalspace
+* "GLOBAL" with quote, will create "GLOBAL" namespace on Lua side
 
 now Lua side will become:
 
@@ -153,7 +157,7 @@ L.bindConst("status"):
 ```
 first argument(actually second) to bindConst will become the namespace. Without namespace, symbol will be put into global namespace
 
-if you use **GLOBAL** or "GLOBAL" as namespace name, it will have no effect
+if you use **GLOBAL** without quote as namespace, it will have no effect
 
 operator `->` have same meaning with bindEnum, to rename exported symbol on Lua side
 
@@ -173,6 +177,7 @@ L.bindFunction:
   abc -> "cba"
 L.bindFunction("alphabet", abc)
 ```
+
 bindFunction more or less behave like bindConst, without namespace, it will bind symbol to global namespace.
 
 overloaded procs will be automatically resolved by their params count and types
@@ -213,14 +218,15 @@ main()
 ```
 this time, Foo will become object name and also namespace name in Lua
 
-"newFoo `->` constructor" have special meaning, it will create constructor on Lua side with special name: `new`
+"newFoo `->` constructor" have special meaning, it will create constructor on Lua side with special name: `new`(this is an artefact)
 but any other constructor like procs will be treated as constructor too:
 
 ```nimrod
 L.bindObject(Foo):
-  newFoo                  #constructor #1 'newFoo'
-  newFoo -> constructor   #constructor #2 'new'
-  newFoo -> "whatever"    #constructor #3 'whatever'
+  newFoo                    #constructor #1 'newFoo'
+  newFoo -> constructor     #constructor #2 'new'
+  newFoo -> "whatever"      #constructor #3 'whatever'
+  makeFoo -> "constructor"  #constructor #4 'constructor'
 ```
 
 operator `->` on non constructor will behave the same as other binder.

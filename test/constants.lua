@@ -12,7 +12,6 @@ assert(mmm.PROTON32 == 15)
 assert(mmm.ELECTRON64 == 16)
 assert(mmm.PROTON64 == 17)
   
-
 assert(ccc.LABEL_STYLE_CH[0] == "D") --["D", "R", "r", "A", "a"]
 assert(ccc.INFO_FIELD[0] == "Creator")--["Creator", "Producer", "Title", "Subject", "Author", "Keywords"]
 assert(ccc.STAIR[0] == 123) --[123, 456]
