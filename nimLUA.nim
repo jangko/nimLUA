@@ -225,7 +225,8 @@ proc genProxyMacro(arg: NimNode, opts: bindFlags, proxyName: string): NimNode {.
     elemIdent = "[]"
 
   if registerObject:
-    nlb.add "  result = bind$1Impl(\"$2\", \"$3\", objSym, $4)\n" % [proxyName, luaCtx, objectNewName, elemIdent]
+    nlb.add "  result = bind$1Impl(\"$2\", \"$3\", objSym, $4)\n" % 
+      [proxyName, luaCtx, objectNewName, elemIdent]
   else:
     nlb.add "  result = bind$1Impl(\"$2\", $3 $4)\n" % [proxyName, luaCtx, libName, elemIdent]
 
@@ -477,7 +478,7 @@ proc constructBasicRet(mType: NimNode, arg, indent: string): string {.compileTim
     return indent & "L.pushBoolean(" & arg & ".cint)\n"
 
   if retType == "char":
-    return indent & "L.pushInteger(lua_Integer(" & arg & ")).chr\n"
+    return indent & "L.pushInteger(lua_Integer(" & arg & "))\n"
 
   result = ""
 
@@ -499,26 +500,47 @@ proc constructComplexArg(mType: NimNode, i: int): string {.compileTime.} =
               
   error("unknown param type: " & $mType.kind & "\n" & mType.treeRepr)
   result = ""
+  
+proc constructRet(retType: NimNode, procCall, indent: string): string {.compileTime.}
 
-proc constructComplexRet(mType: NimNode, procCall: string): string {.compileTime.} =
+proc genArrayRet(nType: NimNode, procCall, indent: string): string {.compileTime.} =
+  let lo = nType[1][1].intVal
+  let hi = nType[1][2].intVal
+  let retType = nType[2]
+
+  var glue = indent & "L.createTable($1, 0)\n" % [$hi]
+  glue.add indent & "let arrTmp = $1\n" % [procCall]
+  glue.add indent & "for i in $1..$2:\n" % [$lo, $hi]
+  let res = constructRet(retType, "arrTmp[i]", indent & "  ")
+  glue.add res
+  glue.add indent & "  L.rawSeti(-2, i.cint)\n"
+  if res != "": return glue
+   
+  error("unknown array ret type: " & $nType.kind & "\n" & nType.treeRepr)
+  result = ""
+
+proc constructComplexRet(mType: NimNode, procCall, indent: string): string {.compileTime.} =
   if mType.kind == nnkSym:
     let nType = getType(mType)
+    if nType.kind == nnkBracketExpr and $nType[0] == "array":
+      return genArrayRet(nType, procCall, indent)
+      
     if nType.kind in {nnkObjectTy, nnkRefTy}:
       let subjectName = registerObject(mType)
-      var glue = "  var proxy = " & newUD(subjectName)
-      glue.add "  proxy.ud = $1\n" % [procCall]
-      if isRefType(mType): glue.add "  GC_ref(proxy.ud)\n"
-      glue.add "  L.getMetatable(luaL_$1)\n" % [subjectName]
-      glue.add "  discard L.setMetatable(-2)\n"
+      var glue = indent & "var proxy = " & newUD(subjectName)
+      glue.add indent & "proxy.ud = $1\n" % [procCall]
+      if isRefType(mType): glue.add indent & "GC_ref(proxy.ud)\n"
+      glue.add indent & "L.getMetatable(luaL_$1)\n" % [subjectName]
+      glue.add indent & "discard L.setMetatable(-2)\n"
       return glue
 
   if mType.kind == nnkVarTy:
     if getType(mType[0]).kind in {nnkObjectTy, nnkRefTy}:
       let subjectName = registerObject(mType)
-      var glue = "  var proxy = " & newUD(subjectName)
-      glue.add "  proxy.ud = $1\n" % [procCall]
-      glue.add "  L.getMetatable(luaL_$1)\n" % [subjectName]
-      glue.add "  discard L.setMetatable(-2)\n"
+      var glue = indent & "var proxy = " & newUD(subjectName)
+      glue.add indent & "proxy.ud = $1\n" % [procCall]
+      glue.add indent & "L.getMetatable(luaL_$1)\n" % [subjectName]
+      glue.add indent & "discard L.setMetatable(-2)\n"
       return glue
 
   error("unknown ret type: " & $mType.kind & "\n" & mType.treeRepr)
@@ -532,11 +554,11 @@ proc constructArg(mName, mType: NimNode, i: int): string {.compileTime.} =
   else:
     result = constructComplexArg(mType, i)
 
-proc constructRet(retType: NimNode, procCall: string): string {.compileTime.} =
+proc constructRet(retType: NimNode, procCall, indent: string): string =
   case retType.kind:
   of nnkSym:
-    result = constructBasicRet(retType, procCall, "  ")
-    if result == "": result = constructComplexRet(retType, procCall)
+    result = constructBasicRet(retType, procCall, indent)
+    if result == "": result = constructComplexRet(retType, procCall, indent)
   else:
     error("unsupported return type: " & $retType.kind & "\n" & retType.treeRepr)
 
@@ -578,7 +600,7 @@ proc genOvCallSingle(ovp: ovProcElem, procName, indent: string, flags: ovFlags):
       if ovp.retType.kind == nnkEmpty:
         glue.add indent & "  " & procCall & "\n"        
       else:
-        glue.add indent & constructRet(ovp.retType, procCall)
+        glue.add indent & constructRet(ovp.retType, procCall, "  ")
         numRet = 1
 
       inc(numRet, outValueList.len)
