@@ -214,12 +214,21 @@ main()
 this time, Foo will become object name and also namespace name in Lua
 
 "newFoo `->` constructor" have special meaning, it will create constructor on Lua side with special name: `new`
+but any other constructor like procs will be treated as constructor too:
+
+```nimrod
+L.bindObject(Foo):
+  newFoo                  #constructor #1 'newFoo'
+  newFoo -> constructor   #constructor #2 'new'
+  newFoo -> "whatever"    #constructor #3 'whatever'
+```
 
 operator `->` on non constructor will behave the same as other binder.
 
-overloaded proc will automatically resolved by their params count and types
+overloaded proc will be automatically resolved by their params count and types, including overloaded constructor
 
-destructor will be generated automatically
+destructor will be generated automatically for ref object, none for regular object. 
+GC safety works as usual on both side of Nim and Lua, no need to worry, except when you manually allocated memory
 
 ```Lua
 local foo = Foo.new("fred")
