@@ -147,7 +147,7 @@ proc genProxyMacro(arg: NimNode, opts: bindFlags, proxyName: string): NimNode {.
         libName = n.strVal
         libKind = n.kind
       else:
-        error("param " & $i & " must be an identifier, not string literal\n" & arg.treeRepr)
+        error("param " & $i & " must be an identifier, not string literal\n" & toStrLit(callSite()).treeRepr)
     of nnkIdent:
       if i == 1 and $n == "GLOBAL" and useLib: 
         libName = $n
@@ -473,7 +473,7 @@ var outValueList {.compileTime.}: seq[string]
 
 proc constructComplexArg(mType: NimNode, i: int): string {.compileTime.} =
   if mType.kind == nnkSym:
-    let nType = getType(mType)
+    let nType = getImpl(mType.symbol)[2]
     if nType.kind in {nnkObjectTy, nnkRefTy}:
       return checkUD(registerObject(mType), $i)
 
@@ -508,15 +508,15 @@ proc genArrayRet(nType: NimNode, procCall, indent: string): string {.compileTime
 
 proc constructComplexRet(mType: NimNode, procCall, indent: string): string {.compileTime.} =
   if mType.kind == nnkSym:
-    let nType = getType(mType)
+    let nType = getImpl(mType.symbol)[2]
     if nType.kind == nnkBracketExpr and $nType[0] == "array":
       return genArrayRet(nType, procCall, indent)
       
     if nType.kind in {nnkObjectTy, nnkRefTy}:
       let subjectName = registerObject(mType)
-      var glue = indent & "var proxy = " & newUD(subjectName)
-      glue.add indent & "proxy.ud = $1\n" % [procCall]
-      if isRefType(mType): glue.add indent & "GC_ref(proxy.ud)\n"
+      var glue = indent & "var proxyret = " & newUD(subjectName)
+      glue.add indent & "proxyret.ud = $1\n" % [procCall]
+      if isRefType(mType): glue.add indent & "GC_ref(proxyret.ud)\n"
       glue.add indent & "L.getMetatable(luaL_$1)\n" % [subjectName]
       glue.add indent & "discard L.setMetatable(-2)\n"
       return glue
@@ -551,8 +551,8 @@ proc constructRet(retType: NimNode, procCall, indent: string): string =
 
 proc argAttr(mType: NimNode): string {.compileTime.} =
   if mType.kind == nnkSym:
-    let nType = getType(mType)
-    if nType.kind in {nnkObjectTy, nnkRefTy}:
+    let nType = getImpl(mType.symbol)
+    if nType.kind == nnkTypeDef and nType[2].kind in {nnkObjectTy, nnkRefTy}:
       return ".ud"
 
   if mType.kind == nnkVarTy:
@@ -572,7 +572,7 @@ proc genOvCallSingle(ovp: ovProcElem, procName, indent: string, flags: ovFlags):
     glue.add indent & "  var arg" & $i & " = " & constructArg(param.mName, param.mType, i + 1)
     glueParam.add "arg" & $i & argAttr(param.mType)
     if i < ovp.params.len-1: glueParam.add ", "
-
+  
   if ovfConstructor in flags:
     let procCall = procName & "(" & glueParam & ")"
     glue.add indent & "  proxy.ud = " & procCall & "\n"
@@ -744,7 +744,7 @@ proc bindFuncImpl*(SL, libName: string, libKind: NimNodeKind, arg: openArray[ele
 
   if exportLib:
     glue.add SL & ".setGlobal(\"" & libName & "\")\n"
-  
+
   result = parseCode(gContext & glue)
 
 #call this macro with following params pattern:
@@ -932,15 +932,15 @@ proc bindObjectSingleMethod(n, subject: NimNode, glueProc, procName, subjectName
   let params = n[3]
   let retType = params[0]
   let argList = paramsToArgList(params)
-
+  
   if eqType(subject, retType):
     return bindSingleConstructor(n, subject, glueProc, procName, subjectName)
 
   if argList.len == 0:
     error("invalid object method")
 
-  if subject.kind != argList[0].mType.kind and not eqType(subject, argList[0].mType):
-    error("object method need object type as first param")
+  if not eqType(subject, argList[0].mType):
+    error("object method need object type as first param: " & procName)
 
   var glue = "proc " & glueProc & "(L: PState): cint {.cdecl.} =\n"
   glue.add "  var proxy = " & checkUD(subjectName, "1")

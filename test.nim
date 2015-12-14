@@ -258,6 +258,7 @@ proc main() =
     FRUIT -> "GLOBAL"
   
   L.test("namespace.lua")
+  
   L.close()
 
 main()
