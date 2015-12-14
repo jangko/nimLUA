@@ -29,9 +29,9 @@ export lua, macros
 
 type
   elemTup = tuple[
-    node: NimNode, 
-    name: string, 
-    kind: NimNodeKind, 
+    node: NimNode,
+    name: string,
+    kind: NimNodeKind,
     rhsKind: NimNodeKind
   ]
 
@@ -143,16 +143,16 @@ proc genProxyMacro(arg: NimNode, opts: bindFlags, proxyName: string): NimNode {.
       else:
         error("param " & $i & " must be an identifier, not symbol\n" & arg.treeRepr)
     of nnkStrLit:
-      if i == 1 and useLib: 
+      if i == 1 and useLib:
         libName = n.strVal
         libKind = n.kind
       else:
         error("param " & $i & " must be an identifier, not string literal\n" & toStrLit(callSite()).treeRepr)
     of nnkIdent:
-      if i == 1 and $n == "GLOBAL" and useLib: 
+      if i == 1 and $n == "GLOBAL" and useLib:
         libName = $n
         libKind = n.kind
-      elif i == 1 and registerObject: 
+      elif i == 1 and registerObject:
         objectName = $n
         objectNewName = $n
       else:
@@ -198,7 +198,7 @@ proc genProxyMacro(arg: NimNode, opts: bindFlags, proxyName: string): NimNode {.
     elemIdent = "[]"
 
   if registerObject:
-    nlb.add "  result = bind$1Impl(\"$2\", \"$3\", objSym, $4)\n" % 
+    nlb.add "  result = bind$1Impl(\"$2\", \"$3\", objSym, $4)\n" %
       [proxyName, luaCtx, objectNewName, elemIdent]
   else:
     nlb.add "  result = bind$1Impl(\"$2\", $3 $4)\n" % [proxyName, luaCtx, libName, elemIdent]
@@ -290,7 +290,7 @@ proc addMemberCap(SL, libName: string, argLen: int): string {.compileTime.} =
     return glue
   else:
     result = "$1.createTable(0.cint, $2.cint)\n" % [SL, $(argLen)]
-    
+
 proc nimLuaPanic(L: PState): cint {.cdecl.} =
   echo "panic"
   echo L.toString(-1)
@@ -381,9 +381,9 @@ proc bindEnumGlobal(SL: string, s: NimNode, kind: NimNodeKind): string {.compile
     glue.add "else:\n"
     glue.add "  $1.pushInteger(lua_Integer($2.$3))\n" % [SL, enumName, sym]
     glue.add "$1.setGlobal(\"$2\")\n" % [SL, sym]
-  
+
   result = glue
-    
+
 #this proc need to be exported because intermediate macro call this proc from
 #callsite module
 proc bindEnumImpl*(SL: string, arg: openArray[elemTup]): NimNode {.compileTime.} =
@@ -470,6 +470,7 @@ proc constructBasicRet(mType: NimNode, arg, indent: string): string {.compileTim
   result = ""
 
 var outValueList {.compileTime.}: seq[string]
+proc constructArg(mType: NimNode, i: int): string {.compileTime.}
 
 proc constructComplexArg(mType: NimNode, i: int): string {.compileTime.} =
   if mType.kind == nnkSym:
@@ -477,6 +478,12 @@ proc constructComplexArg(mType: NimNode, i: int): string {.compileTime.} =
     if nType.kind in {nnkObjectTy, nnkRefTy}:
       return checkUD(registerObject(mType), $i)
 
+    if nType.kind == nnkDistinctTy:
+      return constructArg(nType[0], i)
+      
+    if nType.kind == nnkEnumTy:
+      return constructArg(bindSym"int", i)
+      
   if mType.kind == nnkVarTy:
     let nType = getType(mType[0])
     if nType.kind in {nnkObjectTy, nnkRefTy}:
@@ -484,10 +491,10 @@ proc constructComplexArg(mType: NimNode, i: int): string {.compileTime.} =
     if nType.kind == nnkSym:
       outValueList.add constructBasicRet(nType, "arg" & $(i-1), "")
       return constructBasicArg(nType, i)
-              
+
   error("unknown param type: " & $mType.kind & "\n" & mType.treeRepr)
   result = ""
-  
+
 proc constructRet(retType: NimNode, procCall, indent: string): string {.compileTime.}
 
 proc genArrayRet(nType: NimNode, procCall, indent: string): string {.compileTime.} =
@@ -502,7 +509,7 @@ proc genArrayRet(nType: NimNode, procCall, indent: string): string {.compileTime
   glue.add res
   glue.add indent & "  L.rawSeti(-2, i.cint)\n"
   if res != "": return glue
-   
+
   error("unknown array ret type: " & $nType.kind & "\n" & nType.treeRepr)
   result = ""
 
@@ -511,7 +518,7 @@ proc constructComplexRet(mType: NimNode, procCall, indent: string): string {.com
     let nType = getImpl(mType.symbol)[2]
     if nType.kind == nnkBracketExpr and $nType[0] == "array":
       return genArrayRet(nType, procCall, indent)
-      
+
     if nType.kind in {nnkObjectTy, nnkRefTy}:
       let subjectName = registerObject(mType)
       var glue = indent & "var proxyret = " & newUD(subjectName)
@@ -521,6 +528,9 @@ proc constructComplexRet(mType: NimNode, procCall, indent: string): string {.com
       glue.add indent & "discard L.setMetatable(-2)\n"
       return glue
 
+    if nType.kind == nnkDistinctTy:
+      return constructRet(nType[0], procCall, indent)
+      
   if mType.kind == nnkVarTy:
     if getType(mType[0]).kind in {nnkObjectTy, nnkRefTy}:
       let subjectName = registerObject(mType)
@@ -533,7 +543,7 @@ proc constructComplexRet(mType: NimNode, procCall, indent: string): string {.com
   error("unknown ret type: " & $mType.kind & "\n" & mType.treeRepr)
   result = ""
 
-proc constructArg(mName, mType: NimNode, i: int): string {.compileTime.} =
+proc constructArg(mType: NimNode, i: int): string =
   case mType.kind:
   of nnkSym:
     result = constructBasicArg(mType, i)
@@ -554,6 +564,9 @@ proc argAttr(mType: NimNode): string {.compileTime.} =
     let nType = getImpl(mType.symbol)
     if nType.kind == nnkTypeDef and nType[2].kind in {nnkObjectTy, nnkRefTy}:
       return ".ud"
+      
+    if nType.kind == nnkTypeDef and nType[2].kind in {nnkDistinctTy, nnkEnumTy}:
+      return "." & $nType[0]
 
   if mType.kind == nnkVarTy:
     if getType(mType[0]).kind in {nnkObjectTy, nnkRefTy}:
@@ -569,10 +582,10 @@ proc genOvCallSingle(ovp: ovProcElem, procName, indent: string, flags: ovFlags):
 
   for i in start..ovp.params.len-1:
     let param = ovp.params[i]
-    glue.add indent & "  var arg" & $i & " = " & constructArg(param.mName, param.mType, i + 1)
+    glue.add indent & "  var arg" & $i & " = " & constructArg(param.mType, i + 1)
     glueParam.add "arg" & $i & argAttr(param.mType)
     if i < ovp.params.len-1: glueParam.add ", "
-  
+
   if ovfConstructor in flags:
     let procCall = procName & "(" & glueParam & ")"
     glue.add indent & "  proxy.ud = " & procCall & "\n"
@@ -585,7 +598,7 @@ proc genOvCallSingle(ovp: ovProcElem, procName, indent: string, flags: ovFlags):
     if ovfUseRet in flags:
       var numRet = 0
       if ovp.retType.kind == nnkEmpty:
-        glue.add indent & "  " & procCall & "\n"        
+        glue.add indent & "  " & procCall & "\n"
       else:
         glue.add indent & constructRet(ovp.retType, procCall, "  ")
         numRet = 1
@@ -593,7 +606,7 @@ proc genOvCallSingle(ovp: ovProcElem, procName, indent: string, flags: ovFlags):
       inc(numRet, outValueList.len)
       for s in outValueList:
         glue.add "$1  $2" % [indent, s]
-        
+
       glue.add "$1  return $2\n" % [indent, $numRet]
   result = glue
 
@@ -638,7 +651,7 @@ proc genComplexCheck(mType: NimNode, i: int): string {.compileTime.} =
   if mType.kind == nnkVarTy:
     if getType(mType[0]).kind == nnkSym:
       return genBasicCheck(mType[0], i)
-      
+
   error("genComplexCheck: unknown param type: " & $mType.kind & "\n" & mType.treeRepr)
   result = ""
 
@@ -648,7 +661,7 @@ proc genCheckType(mName, mType: NimNode, i: int): string {.compileTime.} =
     result = genBasicCheck(mType, i)
     if result == "": result = genComplexCheck(mType, i)
   else:
-    result = genComplexCheck(mType, i)    
+    result = genComplexCheck(mType, i)
 
 #second level of ov proc resolution
 proc genCheck(params: seq[argPair], flags: ovFlags): string {.compileTime.} =
@@ -716,7 +729,7 @@ proc bindFuncImpl*(SL, libName: string, libKind: NimNodeKind, arg: openArray[ele
   var glue = ""
   if exportLib:
     glue.add addMemberCap(SL, libName, arg.len)
-    
+
   for i in 0..arg.len-1:
     let n = arg[i]
     if n.node.kind notin {nnkSym, nnkClosedSymChoice}:
@@ -858,7 +871,7 @@ proc bindConstImpl*(SL, libName: string, libKind: NimNodeKind, arg: openArray[el
 
   if exportLib:
     glue.add SL & ".setGlobal(\"" & libName & "\")\n"
-  
+
   result = parseCode(glue)
 
 macro bindConst*(arg: varargs[untyped]): stmt =
@@ -932,7 +945,7 @@ proc bindObjectSingleMethod(n, subject: NimNode, glueProc, procName, subjectName
   let params = n[3]
   let retType = params[0]
   let argList = paramsToArgList(params)
-  
+
   if eqType(subject, retType):
     return bindSingleConstructor(n, subject, glueProc, procName, subjectName)
 

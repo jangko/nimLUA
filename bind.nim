@@ -1,4 +1,4 @@
-import nimLUA, nimBMP, nimAES, nimSHA2, streams
+import nimLUA, "nimPDF/nimBMP", "nimPDF/nimAES", "nimPDF/nimSHA2", streams, "nimPDF/nimPDF"
 
 proc main() =
   var L = newNimLua()
@@ -33,5 +33,30 @@ proc main() =
   L.bindFunction("BMP"):
     loadBMP32
     loadBMP24
+    
+  L.bindEnum:
+    LabelStyle
+    PageOrientationType
+    CoordinateMode
+    DestStyle
+
+  L.bindFunction():
+    getSizeFromName
+    makePageSize
+
+  L.bindObject(DocOpt):
+    makeDocOpt
+    addResourcesPath
+    addImagesPath
+    addFontsPath
+    clearFontsPath
+    clearImagesPath
+    clearResourcesPath
+    clearAllPath
+  
+  L.bindObject(Document):
+    setInfo
+    initPDF
+    
 
 main()
