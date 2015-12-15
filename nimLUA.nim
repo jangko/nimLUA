@@ -75,9 +75,11 @@ var
   regsCount  {.compileTime.} = 0
   objectList {.compileTime.} = newSeq[string]()
   dtorList   {.compileTime.} = newSeq[string]()
+  arrCList   {.compileTime.} = newSeq[string]()
+  outValList {.compileTime.} : seq[string]
   gContext   {.compileTime.} = ""
 
-#inside macro, const bool become nnkIntLit, that's why we need use
+#inside macro, const bool become nnkIntLit, that's why we need to use
 #this trick to test for bool type using 'when internalTestForBOOL(n)'
 proc internalTestForBOOL*[T](a: T): bool {.compileTime.} =
   when a is bool: result = true
@@ -470,9 +472,135 @@ proc constructBasicRet(mType: NimNode, arg, indent, procName: string): string {.
 
   result = ""
 
-var outValueList {.compileTime.}: seq[string]
 proc constructArg(mType: NimNode, i: int, procName: string): string {.compileTime.}
 
+proc argAttr(mType: NimNode): string {.compileTime.} =
+  if mType.kind == nnkSym:
+    let nType = getImpl(mType.symbol)
+    if nType.kind == nnkTypeDef and nType[2].kind in {nnkObjectTy, nnkRefTy}:
+      return ".ud"
+      
+    if nType.kind == nnkTypeDef and nType[2].kind in {nnkDistinctTy, nnkEnumTy}:
+      return "." & $nType[0]   
+
+  if mType.kind == nnkVarTy:
+    if getType(mType[0]).kind in {nnkObjectTy, nnkRefTy}:
+      return ".ud"
+
+  result = ""
+  
+proc hasArrayCheck(name: string): bool {.compileTime.} =
+  for n in arrCList:
+    if n == name: return true
+  result = false
+
+proc setArrayCheck(s: string) {.compileTime.} =
+  arrCList.add(s)
+
+proc stackDump*(L: PState) =
+  let top = L.getTop()
+  echo "total in stack ", top
+  for i in 1..top:
+    #repeat for each level
+    let t = L.luatype(i)
+    case t
+    of LUA_TSTRING:
+      echo "string: '$1'" % L.toString(i)
+    of LUA_TBOOLEAN:
+      echo "boolean $1" % [if L.toBoolean(i) == 1: "true" else: "false"]
+    of LUA_TNUMBER:
+      echo "number: $1" % [$(L.toNumber(i).int)]
+    else:
+      echo "$1" % [$L.typeName(t)]
+
+proc registerArrayCheck(s: NimNode, lo, hi: int, procName: string): string {.compileTime.} =
+  let name = "checkArray$1$2$3" % [$s, $lo, $hi]
+  if not hasArrayCheck(name): 
+    setArrayCheck(name)
+    var glue = "proc $1(L: PState, idx: int): array[$2..$3, $4] =\n" % [name, $lo, $hi, $s]
+    glue.add "  L.checkType(idx.cint, LUA_TTABLE)\n"
+    glue.add "  let len = min(L.llen(idx.cint), result.len)\n"
+    glue.add "  L.pushNil()\n"
+    glue.add "  var i = 0\n"
+    glue.add "  while L.next(idx.cint) != 0:\n"
+    glue.add "    let tmp = " & constructArg(s, -1, procName)
+    glue.add "    result[i+$1] = tmp$2\n" % [$lo, argAttr(s)]
+    glue.add "    L.pop(1.cint)\n"
+    glue.add "    inc i\n"
+    glue.add "    if i >= len: break\n"
+    gContext.add glue
+  result = name
+
+proc registerArrayCheck(s: NimNode, hi: int, procName: string): string {.compileTime.} =
+  let name = "checkArray$1$2" % [$s, $hi]
+  if not hasArrayCheck(name): 
+    setArrayCheck(name)
+    var glue = "proc $1(L: PState, idx: int): array[$2, $3] =\n" % [name, $hi, $s]
+    glue.add "  L.checkType(idx.cint, LUA_TTABLE)\n"
+    glue.add "  let len = min(L.llen(idx.cint), result.len)\n"
+    glue.add "  L.pushNil()\n"
+    glue.add "  var i = 0\n"
+    glue.add "  while L.next(idx.cint) != 0:\n"
+    glue.add "    let tmp = " & constructArg(s, -1, procName)
+    glue.add "    result[i] = tmp$1\n" % [argAttr(s)]
+    glue.add "    L.pop(1.cint)\n"
+    glue.add "    inc i\n"
+    glue.add "    if i >= len: break\n"
+    gContext.add glue
+    
+  result = name
+
+proc registerArrayCheck(s: NimNode, id: string, procName: string): string {.compileTime.} =
+  let name = "checkArray$1$2" % [$s, id]
+  if not hasArrayCheck(name): 
+    setArrayCheck(name)
+    var glue = "proc $1(L: PState, idx: int): array[$2, $3] =\n" % [name, id, $s]
+    glue.add "  L.checkType(idx.cint, LUA_TTABLE)\n"
+    glue.add "  let len = min(L.llen(idx.cint), result.len)\n"
+    glue.add "  L.pushNil()\n"
+    glue.add "  var i = 0\n"
+    glue.add "  while L.next(idx.cint) != 0:\n"
+    glue.add "    let tmp = " & constructArg(s, -1, procName)
+    glue.add "    result[i] = tmp$1\n" % [argAttr(s)]
+    glue.add "    L.pop(1.cint)\n"
+    glue.add "    inc i\n"
+    glue.add "    if i >= len: break\n"
+    gContext.add glue
+    
+  result = name
+  
+proc genArrayArg(nType: NimNode, i: int, procName: string): string {.compileTime.} =
+  var lo, hi, mode: int
+  
+  if nType[1].kind == nnkInfix:
+    lo = int(nType[1][1].intVal)
+    hi = int(nType[1][2].intVal)
+    mode = 1
+  elif nType[1].kind == nnkIntLit:
+    lo = 0
+    hi = int(nType[1].intVal)
+    mode = 2
+  elif nType[1].kind == nnkIdent:
+    mode = 3
+  else:
+    error(procName & ": unknown array param type: " & nType.treeRepr)
+    
+  let argType = nType[2]
+
+  let res = constructArg(argType, -1, procName)
+  let checkArray = if mode == 1:  
+      registerArrayCheck(argType, lo, hi, procName)
+    elif mode == 2:
+      registerArrayCheck(argType, hi, procName)
+    else:
+      registerArrayCheck(argType, $nType[1], procName)
+      
+  var glue = "L.$1($2)\n" % [checkArray, $i]
+  if res != "": return glue
+
+  error(procName & ": unknown array param type: " & $nType.kind & "\n" & nType.treeRepr)
+  result = ""
+  
 proc constructComplexArg(mType: NimNode, i: int, procName: string): string {.compileTime.} =
   if mType.kind == nnkSym:
     let nType = getImpl(mType.symbol)[2]
@@ -484,13 +612,16 @@ proc constructComplexArg(mType: NimNode, i: int, procName: string): string {.com
       
     if nType.kind == nnkEnumTy:
       return constructArg(bindSym"int", i, procName)
+     
+    if nType.kind == nnkBracketExpr and $nType[0] == "array":
+      return genArrayArg(nType, i, procName)
       
   if mType.kind == nnkVarTy:
     let nType = getType(mType[0])
     if nType.kind in {nnkObjectTy, nnkRefTy}:
       return checkUD(registerObject(mType[0]), $i)
     if nType.kind == nnkSym:
-      outValueList.add constructBasicRet(nType, "arg" & $(i-1), "", procName)
+      outValList.add constructBasicRet(nType, "arg" & $(i-1), "", procName)
       return constructBasicArg(nType, i, procName)
 
   error(procName & ": unknown param type: " & $mType.kind & "\n" & mType.treeRepr)
@@ -499,16 +630,45 @@ proc constructComplexArg(mType: NimNode, i: int, procName: string): string {.com
 proc constructRet(retType: NimNode, procCall, indent, procName: string): string {.compileTime.}
 
 proc genArrayRet(nType: NimNode, procCall, indent, procName: string): string {.compileTime.} =
-  let lo = nType[1][1].intVal
-  let hi = nType[1][2].intVal
+  var lo, hi, mode: int
+  
+  if nType[1].kind == nnkInfix:
+    lo = int(nType[1][1].intVal)
+    hi = int(nType[1][2].intVal)
+    mode = 1
+  elif nType[1].kind == nnkIntLit:
+    lo = 0
+    hi = int(nType[1].intVal)
+    mode = 2
+  elif nType[1].kind == nnkIdent:
+    mode = 3
+  else:
+    error(procName & ": unknown array ret type: " & nType.treeRepr)
+    
   let retType = nType[2]
 
-  var glue = indent & "L.createTable($1, 0)\n" % [$hi]
+  var glue = indent & "L.createTable($1+1, 0)\n" % [$hi]
   glue.add indent & "let arrTmp = $1\n" % [procCall]
-  glue.add indent & "for i in $1..$2:\n" % [$lo, $hi]
-  let res = constructRet(retType, "arrTmp[i]", indent & "  ", procName)
-  glue.add res
-  glue.add indent & "  L.rawSeti(-2, i.cint)\n"
+  var res = ""
+    
+  if mode == 1:
+    glue.add indent & "for i in $1..$2:\n" % [$lo, $hi]
+    glue.add indent & "  L.pushInteger(i-$1+1)\n" % [$lo]
+    res = constructRet(retType, "arrTmp[i-$1]" % [$lo], indent & "  ", procName)
+    glue.add res
+  elif mode == 2:
+    glue.add indent & "for i in $1..$2-1:\n" % [$lo, $hi]
+    glue.add indent & "  L.pushInteger(i-$1+1)\n" % [$lo]
+    res = constructRet(retType, "arrTmp[i-$1]" % [$lo], indent & "  ", procName)
+    glue.add res
+  else:
+    glue.add indent & "for i in 0..$1-1:\n" % [$nType[1]]
+    glue.add indent & "  L.pushInteger(i+1)\n"
+    res = constructRet(retType, "arrTmp[i]", indent & "  ", procName)
+    glue.add res
+    
+  glue.add indent & "  L.setTable(-3)\n"
+
   if res != "": return glue
 
   error(procName & ": unknown array ret type: " & $nType.kind & "\n" & nType.treeRepr)
@@ -535,6 +695,10 @@ proc constructComplexRet(mType: NimNode, procCall, indent, procName: string): st
     if nType.kind == nnkEnumTy:
       return indent & "L.pushInteger(lua_Integer(" & procCall & "))\n"
       
+  if mType.kind == nnkBracketExpr:
+    if $mType[0] == "array":
+      return genArrayRet(mType, procCall, indent, procName)
+    
   if mType.kind == nnkVarTy:
     if getType(mType[0]).kind in {nnkObjectTy, nnkRefTy}:
       let subjectName = registerObject(mType)
@@ -561,28 +725,13 @@ proc constructRet(retType: NimNode, procCall, indent, procName: string): string 
     result = constructBasicRet(retType, procCall, indent, procName)
     if result == "": result = constructComplexRet(retType, procCall, indent, procName)
   else:
-    error(procName & ": unsupported return type: " & $retType.kind & "\n" & retType.treeRepr)
-
-proc argAttr(mType: NimNode): string {.compileTime.} =
-  if mType.kind == nnkSym:
-    let nType = getImpl(mType.symbol)
-    if nType.kind == nnkTypeDef and nType[2].kind in {nnkObjectTy, nnkRefTy}:
-      return ".ud"
-      
-    if nType.kind == nnkTypeDef and nType[2].kind in {nnkDistinctTy, nnkEnumTy}:
-      return "." & $nType[0]
-
-  if mType.kind == nnkVarTy:
-    if getType(mType[0]).kind in {nnkObjectTy, nnkRefTy}:
-      return ".ud"
-
-  result = ""
+    result = constructComplexRet(retType, procCall, indent, procName)
 
 proc genOvCallSingle(ovp: ovProcElem, procName, indent: string, flags: ovFlags): string {.compileTime.} =
   var glueParam = ""
   var glue = ""
   let start = if ovfUseObject in flags: 1 else: 0
-  outValueList = @[]
+  outValList = @[]
   
   for i in start..ovp.params.len-1:
     let param = ovp.params[i]
@@ -607,8 +756,8 @@ proc genOvCallSingle(ovp: ovProcElem, procName, indent: string, flags: ovFlags):
         glue.add constructRet(ovp.retType, procCall, indent & "  ", procName)
         numRet = 1
 
-      inc(numRet, outValueList.len)
-      for s in outValueList:
+      inc(numRet, outValList.len)
+      for s in outValList:
         glue.add "$1  $2" % [indent, s]
 
       glue.add "$1  return $2\n" % [indent, $numRet]

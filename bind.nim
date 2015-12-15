@@ -43,6 +43,7 @@ proc main() =
   L.bindFunction():
     getSizeFromName
     makePageSize
+    getVersion
   
   L.bindObject(DocOpt):
     makeDocOpt
@@ -65,6 +66,8 @@ proc main() =
     getUnit
     setCoordinateMode
     getCoordinateMode
+    getSize
+    setFont
     
 
 main()

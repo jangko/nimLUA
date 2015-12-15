@@ -538,7 +538,7 @@ proc loadfile*(L: PState; filename: cstring): cint = L.loadfilex(filename, nil)
 proc loadbufferx*(L: PState; buff: cstring; sz: csize; name, mode: cstring): cint {.iluaL.}
 proc loadstring*(L: PState; s: cstring): cint {.iluaL.}
 proc newstate*(): PState {.iluaL.}
-proc len*(L: PState; idx: cint): cint {.iluaL.}
+proc llen*(L: PState; idx: cint): cint {.iluaL, importc:"luaL_len".}
 proc gsub*(L: PState; s: cstring; p: cstring; r: cstring): cstring {.iluaL.}
 proc setfuncs*(L: PState; L2: ptr luaL_Reg; nup: cint) {.iluaL.}
 proc getsubtable*(L: PState; idx: cint; fname: cstring): cint {.iluaL.}

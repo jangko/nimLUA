@@ -136,32 +136,54 @@ proc fry(a: Fish): string = "fry " & $a.len
 proc mining(): string = "mining gem"
 proc polish(): string = "polishing gem"
 
+const numFruits = 3
+type
+  chemArray = array[0..11, int]
+  geneArray = array[7, GENE]
+  fruitArray = array[numFruits, FRUIT]
+  
+proc chemA(a: chemArray): array[0..5, int] =
+  for i in 0..result.high:
+    result[i] = a[i]
+    
+proc geneA(a: geneArray): array[3, GENE] =
+  for i in 0..result.high:
+    result[i] = a[i]
+  
+proc fruitA(a: fruitArray): array[numFruits, FRUIT] =
+  for i in 0..result.high:
+    result[i] = a[i]
+  
+proc geneB(a: geneArray): geneArray =
+  for i in 0..result.high:
+    result[i] = a[i]
+
 proc main() =
   var L = newNimLua()
 
   L.bindEnum(GENE)
   L.test("single_scoped_enum.lua")
-
+  
   L.bindEnum(GENE -> "DNA", ATOM -> GLOBAL, FRUIT)
   L.test("scoped_and_global_enum.lua")
-
+  
   L.bindEnum:
     ATOM
     GENE
     FRUIT
     `poncho`
   L.test("scoped_enum.lua")
-
+  
   L.bindFunction(mulv, tpc, tpm -> "goodMan")
   L.test("free_function.lua")
-
+  
   L.bindFunction("gum"):
     mulv
     tpc
     tpm -> "goodMan"
     `++`
   L.test("scoped_function.lua")
-
+  
   L.bindConst:
     MANGOES
     PAPAYA
@@ -169,7 +191,7 @@ proc main() =
     MAX_DASH_PATTERN
     CATHODE
     ANODE
-
+  
   L.bindConst("mmm"):
     ELECTRON16
     PROTON16
@@ -178,7 +200,7 @@ proc main() =
     ELECTRON64
     PROTON64
     connected
-
+  
   L.bindConst("ccc"):
     LABEL_STYLE_CH
     INFO_FIELD
@@ -187,19 +209,19 @@ proc main() =
     GREET
     mime
     programme
-
+  
   L.bindConst:
     MANGOES -> "MANGGA"
     PAPAYA -> "PEPAYA"
     LEMON -> "JERUK"
-
+  
   L.bindConst("buah"):
     MANGOES -> "MANGGA"
     PAPAYA -> "PEPAYA"
     LEMON -> "JERUK"
-
+  
   L.test("constants.lua")
-
+  
   L.bindObject(Foo):
     newFoo -> constructor
     addv
@@ -208,30 +230,30 @@ proc main() =
     setAcid
     newFoo
     newFoo -> "whatever"
-
+  
   L.test("fun.lua")
-
+  
   L.bindFunction("mac"):
     machine
-
+  
   L.test("ov_func.lua")
-
+  
   L.bindObject(Acid):
     makeAcid -> constructor
     setLen
     getLen
-
+  
   L.bindFunction("acd"):
     makeAcid
-
+  
   L.bindFunction(makeAcid)
   L.bindObject(Fish):
     fishing -> constructor
-
+  
   L.bindObject(Fish):
     grill
     fry
-
+  
   L.bindFunction("gem", mining)
   L.bindFunction("gem", polish)
   L.bindConst("gem", ANODE)
@@ -241,7 +263,7 @@ proc main() =
     fry
     
   L.test("regular_object.lua")
-
+  
   L.bindFunction(GLOBAL):
     mulv
     
@@ -259,6 +281,13 @@ proc main() =
   
   L.test("namespace.lua")
   
+  L.bindFunction("arr"):
+    chemA
+    geneA
+    fruitA
+    geneB
+    
+  L.test("array_param_ret.lua")
   L.close()
 
 main()
