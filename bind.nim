@@ -39,11 +39,11 @@ proc main() =
     PageOrientationType
     CoordinateMode
     DestStyle
-
+  
   L.bindFunction():
     getSizeFromName
     makePageSize
-
+  
   L.bindObject(DocOpt):
     makeDocOpt
     addResourcesPath
@@ -57,6 +57,14 @@ proc main() =
   L.bindObject(Document):
     setInfo
     initPDF
+    getOpt
+    setLabel
+    loadImage
+    getVersion
+    setUnit
+    getUnit
+    setCoordinateMode
+    getCoordinateMode
     
 
 main()

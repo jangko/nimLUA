@@ -422,7 +422,7 @@ let
   intTypes {.compileTime.} = ["int", "int8", "int16", "int32", "int64", "uint", "uint8", "uint16", "uint32", "uint64"]
   floatTypes {.compileTime.} = ["float", "float32", "float64"]
 
-proc constructBasicArg(mType: NimNode, i: int): string {.compileTime.} =
+proc constructBasicArg(mType: NimNode, i: int, procName: string): string {.compileTime.} =
   let argType = $mType
   for c in intTypes:
     if c == argType:
@@ -446,7 +446,7 @@ proc constructBasicArg(mType: NimNode, i: int): string {.compileTime.} =
 
   result = ""
 
-proc constructBasicRet(mType: NimNode, arg, indent: string): string {.compileTime.} =
+proc constructBasicRet(mType: NimNode, arg, indent, procName: string): string {.compileTime.} =
   let retType = $mType
   for c in intTypes:
     if c == retType:
@@ -471,34 +471,34 @@ proc constructBasicRet(mType: NimNode, arg, indent: string): string {.compileTim
   result = ""
 
 var outValueList {.compileTime.}: seq[string]
-proc constructArg(mType: NimNode, i: int): string {.compileTime.}
+proc constructArg(mType: NimNode, i: int, procName: string): string {.compileTime.}
 
-proc constructComplexArg(mType: NimNode, i: int): string {.compileTime.} =
+proc constructComplexArg(mType: NimNode, i: int, procName: string): string {.compileTime.} =
   if mType.kind == nnkSym:
     let nType = getImpl(mType.symbol)[2]
     if nType.kind in {nnkObjectTy, nnkRefTy}:
       return checkUD(registerObject(mType), $i)
 
     if nType.kind == nnkDistinctTy:
-      return constructArg(nType[0], i)
+      return constructArg(nType[0], i, procName)
       
     if nType.kind == nnkEnumTy:
-      return constructArg(bindSym"int", i)
+      return constructArg(bindSym"int", i, procName)
       
   if mType.kind == nnkVarTy:
     let nType = getType(mType[0])
     if nType.kind in {nnkObjectTy, nnkRefTy}:
       return checkUD(registerObject(mType[0]), $i)
     if nType.kind == nnkSym:
-      outValueList.add constructBasicRet(nType, "arg" & $(i-1), "")
-      return constructBasicArg(nType, i)
+      outValueList.add constructBasicRet(nType, "arg" & $(i-1), "", procName)
+      return constructBasicArg(nType, i, procName)
 
-  error("unknown param type: " & $mType.kind & "\n" & mType.treeRepr)
+  error(procName & ": unknown param type: " & $mType.kind & "\n" & mType.treeRepr)
   result = ""
 
-proc constructRet(retType: NimNode, procCall, indent: string): string {.compileTime.}
+proc constructRet(retType: NimNode, procCall, indent, procName: string): string {.compileTime.}
 
-proc genArrayRet(nType: NimNode, procCall, indent: string): string {.compileTime.} =
+proc genArrayRet(nType: NimNode, procCall, indent, procName: string): string {.compileTime.} =
   let lo = nType[1][1].intVal
   let hi = nType[1][2].intVal
   let retType = nType[2]
@@ -506,19 +506,19 @@ proc genArrayRet(nType: NimNode, procCall, indent: string): string {.compileTime
   var glue = indent & "L.createTable($1, 0)\n" % [$hi]
   glue.add indent & "let arrTmp = $1\n" % [procCall]
   glue.add indent & "for i in $1..$2:\n" % [$lo, $hi]
-  let res = constructRet(retType, "arrTmp[i]", indent & "  ")
+  let res = constructRet(retType, "arrTmp[i]", indent & "  ", procName)
   glue.add res
   glue.add indent & "  L.rawSeti(-2, i.cint)\n"
   if res != "": return glue
 
-  error("unknown array ret type: " & $nType.kind & "\n" & nType.treeRepr)
+  error(procName & ": unknown array ret type: " & $nType.kind & "\n" & nType.treeRepr)
   result = ""
 
-proc constructComplexRet(mType: NimNode, procCall, indent: string): string {.compileTime.} =
+proc constructComplexRet(mType: NimNode, procCall, indent, procName: string): string {.compileTime.} =
   if mType.kind == nnkSym:
     let nType = getImpl(mType.symbol)[2]
     if nType.kind == nnkBracketExpr and $nType[0] == "array":
-      return genArrayRet(nType, procCall, indent)
+      return genArrayRet(nType, procCall, indent, procName)
 
     if nType.kind in {nnkObjectTy, nnkRefTy}:
       let subjectName = registerObject(mType)
@@ -530,7 +530,10 @@ proc constructComplexRet(mType: NimNode, procCall, indent: string): string {.com
       return glue
 
     if nType.kind == nnkDistinctTy:
-      return constructRet(nType[0], procCall, indent)
+      return constructRet(nType[0], procCall, indent, procName)
+      
+    if nType.kind == nnkEnumTy:
+      return indent & "L.pushInteger(lua_Integer(" & procCall & "))\n"
       
   if mType.kind == nnkVarTy:
     if getType(mType[0]).kind in {nnkObjectTy, nnkRefTy}:
@@ -541,24 +544,24 @@ proc constructComplexRet(mType: NimNode, procCall, indent: string): string {.com
       glue.add indent & "discard L.setMetatable(-2)\n"
       return glue
 
-  error("unknown ret type: " & $mType.kind & "\n" & mType.treeRepr)
+  error(procName & ": unknown ret type: " & $mType.kind & "\n" & mType.treeRepr)
   result = ""
 
-proc constructArg(mType: NimNode, i: int): string =
+proc constructArg(mType: NimNode, i: int, procName: string): string =
   case mType.kind:
   of nnkSym:
-    result = constructBasicArg(mType, i)
-    if result == "": result = constructComplexArg(mType, i)
+    result = constructBasicArg(mType, i, procName)
+    if result == "": result = constructComplexArg(mType, i, procName)
   else:
-    result = constructComplexArg(mType, i)
+    result = constructComplexArg(mType, i, procName)
 
-proc constructRet(retType: NimNode, procCall, indent: string): string =
+proc constructRet(retType: NimNode, procCall, indent, procName: string): string =
   case retType.kind:
   of nnkSym:
-    result = constructBasicRet(retType, procCall, indent)
-    if result == "": result = constructComplexRet(retType, procCall, indent)
+    result = constructBasicRet(retType, procCall, indent, procName)
+    if result == "": result = constructComplexRet(retType, procCall, indent, procName)
   else:
-    error("unsupported return type: " & $retType.kind & "\n" & retType.treeRepr)
+    error(procName & ": unsupported return type: " & $retType.kind & "\n" & retType.treeRepr)
 
 proc argAttr(mType: NimNode): string {.compileTime.} =
   if mType.kind == nnkSym:
@@ -580,10 +583,10 @@ proc genOvCallSingle(ovp: ovProcElem, procName, indent: string, flags: ovFlags):
   var glue = ""
   let start = if ovfUseObject in flags: 1 else: 0
   outValueList = @[]
-
+  
   for i in start..ovp.params.len-1:
     let param = ovp.params[i]
-    glue.add indent & "  var arg" & $i & " = " & constructArg(param.mType, i + 1)
+    glue.add indent & "  var arg" & $i & " = " & constructArg(param.mType, i + 1, procName)
     glueParam.add "arg" & $i & argAttr(param.mType)
     if i < ovp.params.len-1: glueParam.add ", "
 
@@ -601,7 +604,7 @@ proc genOvCallSingle(ovp: ovProcElem, procName, indent: string, flags: ovFlags):
       if ovp.retType.kind == nnkEmpty:
         glue.add indent & "  " & procCall & "\n"
       else:
-        glue.add indent & constructRet(ovp.retType, procCall, "  ")
+        glue.add constructRet(ovp.retType, procCall, indent & "  ", procName)
         numRet = 1
 
       inc(numRet, outValueList.len)
@@ -980,7 +983,7 @@ proc bindObjectOverloadedMethod(ov, subject: NimNode, glueProc, procName, subjec
       continue
 
     if argList.len == 0: continue #not a valid object method
-    if subject.kind != argList[0].mType.kind and not eqType(subject, argList[0].mType): continue
+    if not eqType(subject, argList[0].mType): continue
     ovl.addOvProc(retType, argList)
 
   if ovc.len > 0:
