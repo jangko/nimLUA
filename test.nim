@@ -141,6 +141,8 @@ type
   chemArray = array[0..11, int]
   geneArray = array[7, GENE]
   fruitArray = array[numFruits, FRUIT]
+  fruitSet = set[FRUIT]
+  cSet = set[char]
   
 proc chemA(a: chemArray): array[0..5, int] =
   for i in 0..result.high:
@@ -158,9 +160,33 @@ proc geneB(a: geneArray): geneArray =
   for i in 0..result.high:
     result[i] = a[i]
 
+proc geneC(a: array[7, GENE]): geneArray =
+  for i in 0..result.high:
+    result[i] = a[i]
+
+proc fruitC(a: array[numFruits, FRUIT]): fruitArray =
+  for i in 0..result.high:
+    result[i] = a[i]
+
+proc chemC(a: array[0..11, int]): chemArray =
+  for i in 0..result.high:
+    result[i] = a[i]
+    
 proc fruitE(a: FRUIT): ATOM =
   if a == BANANA: result = PROTON
   else: result = NEUTRON
+  
+proc fruitS(a: fruitSet): set[FRUIT] =
+  for k in a: result.incl k
+
+proc alphaS(a: cSet): set[char] =
+  for k in a: result.incl k
+
+proc fruitSA(a: set[FRUIT]): fruitSet =
+  for k in a: result.incl k
+
+proc alphaSA(a: set[char]): cSet =
+  for k in a: result.incl k
   
 proc main() =
   var L = newNimLua()
@@ -290,6 +316,9 @@ proc main() =
     geneA
     fruitA
     geneB
+    geneC
+    fruitC
+    chemC
     
   L.test("array_param_ret.lua")
   
@@ -297,6 +326,15 @@ proc main() =
     fruitE -> "radiate"
     
   L.test("enum_param_ret.lua")
+  
+  L.bindFunction("set"):
+    fruitS
+    alphaS
+    fruitSA
+    alphaSA
+    
+  L.test("set_param_ret.lua")
+  
   L.close()
 
 main()

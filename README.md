@@ -53,7 +53,7 @@ no need to remember complicated API, the API is simple but powerful
 | bool | boolean |
 | seq[T] | ? under construction |
 | pointer | ? under construction |
-| set[T] | ? under construction |
+| set[T] | table with unique element |
 | tuple | ? under construction |
 | ptr T | ? under construction |
 | range/subrange | ? under construction |
