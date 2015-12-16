@@ -53,8 +53,8 @@ no need to remember complicated API, the API is simple but powerful
 | bool | boolean |
 | seq[T] | array[1..n] |
 | set[T] | table with unique element |
-| pointer | ? under construction |
-| ptr T | ? under construction |
+| pointer | light user data |
+| ptr T | light user data |
 | tuple | ? under construction |
 | range/subrange | ? under construction |
 

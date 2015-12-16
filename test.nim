@@ -146,6 +146,9 @@ type
   fruitSeq = seq[FRUIT]
   geneSeq = seq[GENE]
   stringSeq = seq[string]
+  PGene = ptr GENE
+  Pint = pointer
+  PPGene = ptr ptr GENE
   
 proc chemA(a: chemArray): array[0..5, int] =
   for i in 0..result.high:
@@ -198,6 +201,31 @@ proc geneQA(a: seq[GENE]): geneSeq = result = a
 proc stringQ(a: stringSeq): seq[string] = result = a
 proc stringQA(a: seq[string]): stringSeq = result = a
 
+proc seedP(): Pint = cast[Pint](123)
+proc geneP(a: PGene): Pint =
+  result = cast[Pint](a)
+  
+proc intP(a: Pint): PGene =
+  result = cast[PGene](a)
+
+proc genePA(a: ptr GENE): pointer =
+  result = cast[pointer](a)
+
+proc intPA(a: pointer): ptr GENE =
+  result = cast[ptr GENE](a)
+
+proc genePPA(a: PPGene): pointer =
+  result = cast[pointer](a)
+  
+proc intPPA(a: ptr ptr GENE): pointer =
+  result = cast[pointer](a)
+  
+proc genePPB(a: pointer): PPGene =
+  result = cast[PPGEne](a)
+  
+proc intPPB(a: pointer): ptr ptr GENE =
+  result = cast[ptr ptr GENE](a)
+  
 proc main() =
   var L = newNimLua()
 
@@ -259,7 +287,6 @@ proc main() =
   #  MANGOES -> "MANGGA"
   #  PAPAYA -> "PEPAYA"
   #  LEMON -> "JERUK"
-  #
   #L.test("constants.lua")
   #
   #L.bindObject(Foo):
@@ -270,12 +297,10 @@ proc main() =
   #  setAcid
   #  newFoo
   #  newFoo -> "whatever"
-  #
   #L.test("fun.lua")
   #
   #L.bindFunction("mac"):
   #  machine
-  #
   #L.test("ov_func.lua")
   #
   #L.bindObject(Acid):
@@ -301,7 +326,6 @@ proc main() =
   #L.bindObject(Fish -> "kakap"):
   #  grill
   #  fry
-  #  
   #L.test("regular_object.lua")
   #
   #L.bindFunction(GLOBAL):
@@ -318,7 +342,6 @@ proc main() =
   #L.bindEnum:
   #  GENE -> GLOBAL
   #  FRUIT -> "GLOBAL"
-  #
   #L.test("namespace.lua")
   #
   #L.bindFunction("arr"):
@@ -329,12 +352,10 @@ proc main() =
   #  geneC
   #  fruitC
   #  chemC
-  #  
   #L.test("array_param_ret.lua")
   #
   #L.bindFunction("proto_banana"):
   #  fruitE -> "radiate"
-  #  
   #L.test("enum_param_ret.lua")
   #
   #L.bindFunction("set"):
@@ -342,17 +363,28 @@ proc main() =
   #  alphaS
   #  fruitSA
   #  alphaSA
-  #  
   #L.test("set_param_ret.lua")
   
-  L.bindFunction("seq"):
-    fruitQ
-    fruitQA
-    geneQ
-    geneQA
-    stringQ
-    stringQA
-  L.test("sequence_param_ret.lua")
+  #L.bindFunction("seq"):
+  #  fruitQ
+  #  fruitQA
+  #  geneQ
+  #  geneQA
+  #  stringQ
+  #  stringQA
+  #L.test("sequence_param_ret.lua")
+  
+  L.bindFunction("ptr"):
+    seedP
+    geneP
+    genePA
+    intP
+    intPA
+    genePPA
+    intPPA
+    genePPB
+    intPPB
+  L.test("ptr_pointer.lua")
   
   L.close()
 

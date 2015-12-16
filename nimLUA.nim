@@ -445,6 +445,9 @@ proc constructBasicArg(mType: NimNode, i: int, procName: string): string {.compi
   if argType == "char":
     return "L.checkInteger(" & $i & ").chr\n"
 
+  if argType == "pointer":
+    return "L.toUserData(" & $i & ")\n"
+    
   result = ""
 
 proc constructBasicRet(mType: NimNode, arg, indent, procName: string): string {.compileTime.} =
@@ -469,6 +472,9 @@ proc constructBasicRet(mType: NimNode, arg, indent, procName: string): string {.
   if retType == "char":
     return indent & "L.pushInteger(lua_Integer(" & arg & "))\n"
 
+  if retType == "pointer":
+    return indent & "L.pushLightUserData(" & arg & ")\n"
+    
   result = ""
 
 proc constructArg(mType: NimNode, i: int, procName: string): string {.compileTime.}
@@ -649,9 +655,14 @@ proc genSequenceArg(nType: NimNode, i: int, procName: string): string {.compileT
   error(procName & ": unknown seq param type: " & $nType.kind & "\n" & nType.treeRepr)
   result = ""
   
+proc genPtrArg(nType: NimNode, i: int, procName: string): string {.compileTime.} =
+  let argType = $nType[0].toStrLit
+  result = "cast[ptr $1](L.toUserData($2.cint))\n" % [argType, $i]
+  
 proc constructComplexArg(mType: NimNode, i: int, procName: string): string {.compileTime.} =
   if mType.kind == nnkSym:
     let nType = getImpl(mType.symbol)[2]
+    
     if nType.kind in {nnkObjectTy, nnkRefTy}:
       return checkUD(registerObject(mType), $i)
 
@@ -670,6 +681,13 @@ proc constructComplexArg(mType: NimNode, i: int, procName: string): string {.com
 
       if $nType[0] == "seq":
         return genSequenceArg(nType, i, procName)
+    
+    if nType.kind == nnkPtrTy:
+      return genPtrArg(nType, i, procName)
+      
+    if nType.kind == nnkSym:
+      if $nType == "pointer":
+        return "L.toUserData($1.cint)\n" % [$i]
         
   if mType.kind == nnkBracketExpr:
     if $mType[0] == "array":
@@ -681,6 +699,9 @@ proc constructComplexArg(mType: NimNode, i: int, procName: string): string {.com
     if $mType[0] == "seq":
       return genSequenceArg(mType, i, procName)
         
+  if mType.kind == nnkPtrTy:
+    return genPtrArg(mType, i, procName)
+    
   if mType.kind == nnkVarTy:
     let nType = getType(mType[0])
     if nType.kind in {nnkObjectTy, nnkRefTy}:
@@ -782,6 +803,7 @@ proc genSequenceRet(nType: NimNode, procCall, indent, procName: string): string 
 proc constructComplexRet(mType: NimNode, procCall, indent, procName: string): string {.compileTime.} =
   if mType.kind == nnkSym:
     let nType = getImpl(mType.symbol)[2]
+
     if nType.kind == nnkBracketExpr:
       if $nType[0] == "array":
         return genArrayRet(nType, procCall, indent, procName)
@@ -804,7 +826,17 @@ proc constructComplexRet(mType: NimNode, procCall, indent, procName: string): st
 
     if nType.kind == nnkEnumTy:
       return indent & "L.pushInteger(lua_Integer(" & procCall & "))\n"
+        
+    if nType.kind == nnkPtrTy:
+      return indent & "L.pushLightUserData(cast[pointer](" & procCall & "))\n"
 
+    if nType.kind == nnkSym:
+      if $nType == "pointer":
+        return indent & "L.pushLightUserData(" & procCall & ")\n"
+  
+  if mType.kind == nnkPtrTy:
+    return indent & "L.pushLightUserData(cast[pointer](" & procCall & "))\n"
+      
   if mType.kind == nnkBracketExpr:
     if $mType[0] == "array":
       return genArrayRet(mType, procCall, indent, procName)
@@ -832,7 +864,7 @@ proc constructArg(mType: NimNode, i: int, procName: string): string =
     if result == "": result = constructComplexArg(mType, i, procName)
   else:
     result = constructComplexArg(mType, i, procName)
-
+  
 proc constructRet(retType: NimNode, procCall, indent, procName: string): string =
   case retType.kind:
   of nnkSym:
@@ -1025,8 +1057,6 @@ proc bindFuncImpl*(SL, libName: string, libKind: NimNodeKind, arg: openArray[ele
   if exportLib:
     glue.add SL & ".setGlobal(\"" & libName & "\")\n"
 
-  echo gContext
-  echo glue
   result = parseCode(gContext & glue)
 
 #call this macro with following params pattern:
