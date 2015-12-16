@@ -26,7 +26,7 @@ glue code generator to bind Nim and Lua together using Nim's powerful macro
 * complex data types conversion, at least standard container
 * properties getter/setter
 * closure binding
-* don't know, any ideas?
+* access Lua code/data from Nim
 
 - - -
 **Current version API**:
@@ -46,16 +46,16 @@ no need to remember complicated API, the API is simple but powerful
 |--------------------------------|----------------------------------|
 | char,int,uint,int8-64,uint8-64 | integer/number |
 | float, float32, float64 | number |
-| array[0..n, T], [n, T] | array with starting indices of 1 |
+| array[0..n, T], [n, T] | array[1..n] |
 | enum | integer/number |
 | string, cstring | string |
 | ref/object | userdata |
 | bool | boolean |
-| seq[T] | ? under construction |
-| pointer | ? under construction |
+| seq[T] | array[1..n] |
 | set[T] | table with unique element |
-| tuple | ? under construction |
+| pointer | ? under construction |
 | ptr T | ? under construction |
+| tuple | ? under construction |
 | range/subrange | ? under construction |
 
 ---

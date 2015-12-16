@@ -613,19 +613,42 @@ proc registerSetCheck(s: NimNode, procName: string): string {.compileTime.} =
   
 proc genSetArg(nType: NimNode, i: int, procName: string): string {.compileTime.} =
   let argType = nType[1]
-  
-  #for c in setTypes:
-  #  if c == $argType:
-      
   let res = constructArg(argType, -1, procName)
   let checkSet = registerSetCheck(argType, procName)
-
   var glue = "L.$1($2)\n" % [checkSet, $i]
   if res != "": return glue
-
   error(procName & ": unknown set param type: " & $nType.kind & "\n" & nType.treeRepr)
   result = ""
 
+proc registerSequenceCheck(s: NimNode, procName: string): string {.compileTime.} =
+  let name = "checkSequence$1" % [$s]
+  if not hasName(name):
+    setName(name)
+    var glue = "proc $1(L: PState, idx: int): seq[$2] =\n" % [name, $s]
+    glue.add "  L.checkType(idx.cint, LUA_TTABLE)\n"
+    glue.add "  let len = L.llen(idx.cint)\n"
+    glue.add "  L.pushNil()\n"
+    glue.add "  result = newSeq[$1](len)\n" % [$s]
+    glue.add "  var i = 0\n"
+    glue.add "  while L.next(idx.cint) != 0:\n"
+    glue.add "    let tmp = " & constructArg(s, -1, procName)
+    glue.add "    result[i] = tmp$1\n" % [argAttr(s)]
+    glue.add "    L.pop(1.cint)\n"
+    glue.add "    inc i\n"
+    glue.add "    if i >= len: break\n"
+    gContext.add glue
+
+  result = name
+  
+proc genSequenceArg(nType: NimNode, i: int, procName: string): string {.compileTime.} =
+  let argType = nType[1]
+  let res = constructArg(argType, -1, procName)
+  let checkSeq = registerSequenceCheck(argType, procName)
+  var glue = "L.$1($2)\n" % [checkSeq, $i]
+  if res != "": return glue
+  error(procName & ": unknown seq param type: " & $nType.kind & "\n" & nType.treeRepr)
+  result = ""
+  
 proc constructComplexArg(mType: NimNode, i: int, procName: string): string {.compileTime.} =
   if mType.kind == nnkSym:
     let nType = getImpl(mType.symbol)[2]
@@ -645,12 +668,18 @@ proc constructComplexArg(mType: NimNode, i: int, procName: string): string {.com
       if $nType[0] == "set":
         return genSetArg(nType, i, procName)
 
-  if mType.kind == nnkBracketExpr:
-      if $mType[0] == "array":
-        return genArrayArg(mType, i, procName)
+      if $nType[0] == "seq":
+        return genSequenceArg(nType, i, procName)
         
-      if $mType[0] == "set":
-        return genSetArg(mType, i, procName)
+  if mType.kind == nnkBracketExpr:
+    if $mType[0] == "array":
+      return genArrayArg(mType, i, procName)
+      
+    if $mType[0] == "set":
+      return genSetArg(mType, i, procName)
+      
+    if $mType[0] == "seq":
+      return genSequenceArg(mType, i, procName)
         
   if mType.kind == nnkVarTy:
     let nType = getType(mType[0])
@@ -730,6 +759,26 @@ proc genSetRet(nType: NimNode, procCall, indent, procName: string): string {.com
   error(procName & ": unknown set ret type: " & $nType.kind & "\n" & nType.treeRepr)
   result = ""
 
+proc genSequenceRet(nType: NimNode, procCall, indent, procName: string): string {.compileTime.} =
+  let retType = nType[1]
+  var glue = ""
+  
+  glue.add indent & "let seqTmp = $1\n" % [procCall]
+  glue.add indent & "L.createTable((seqTmp.len+1).cint, 0.cint)\n"
+  glue.add indent & "var seqIdx = 1\n"
+  
+  var res = ""
+  glue.add indent & "for k in seqTmp:\n"
+  glue.add indent & "  L.pushInteger(seqIdx)\n"
+  res = constructRet(retType, "k", indent & "  ", procName)
+  glue.add res
+  glue.add indent & "  L.setTable(-3)\n"
+  glue.add indent & "  inc seqIdx\n"
+  if res != "": return glue
+
+  error(procName & ": unknown seq ret type: " & $nType.kind & "\n" & nType.treeRepr)
+  result = ""
+
 proc constructComplexRet(mType: NimNode, procCall, indent, procName: string): string {.compileTime.} =
   if mType.kind == nnkSym:
     let nType = getImpl(mType.symbol)[2]
@@ -738,7 +787,9 @@ proc constructComplexRet(mType: NimNode, procCall, indent, procName: string): st
         return genArrayRet(nType, procCall, indent, procName)
       if $nType[0] == "set":
         return genSetRet(nType, procCall, indent, procName)
-      
+      if $nType[0] == "seq":
+        return genSequenceRet(nType, procCall, indent, procName)
+        
     if nType.kind in {nnkObjectTy, nnkRefTy}:
       let subjectName = registerObject(mType)
       var glue = indent & "var proxyret = " & newUD(subjectName)
@@ -757,10 +808,11 @@ proc constructComplexRet(mType: NimNode, procCall, indent, procName: string): st
   if mType.kind == nnkBracketExpr:
     if $mType[0] == "array":
       return genArrayRet(mType, procCall, indent, procName)
-
     if $mType[0] == "set":
       return genSetRet(mType, procCall, indent, procName)
-      
+    if $mType[0] == "seq":
+      return genSequenceRet(mType, procCall, indent, procName)
+        
   if mType.kind == nnkVarTy:
     if getType(mType[0]).kind in {nnkObjectTy, nnkRefTy}:
       let subjectName = registerObject(mType)
@@ -973,6 +1025,8 @@ proc bindFuncImpl*(SL, libName: string, libKind: NimNodeKind, arg: openArray[ele
   if exportLib:
     glue.add SL & ".setGlobal(\"" & libName & "\")\n"
 
+  echo gContext
+  echo glue
   result = parseCode(gContext & glue)
 
 #call this macro with following params pattern:
