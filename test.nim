@@ -158,6 +158,10 @@ proc geneB(a: geneArray): geneArray =
   for i in 0..result.high:
     result[i] = a[i]
 
+proc fruitE(a: FRUIT): ATOM =
+  if a == BANANA: result = PROTON
+  else: result = NEUTRON
+  
 proc main() =
   var L = newNimLua()
 
@@ -288,6 +292,11 @@ proc main() =
     geneB
     
   L.test("array_param_ret.lua")
+  
+  L.bindFunction("proto_banana"):
+    fruitE -> "radiate"
+    
+  L.test("enum_param_ret.lua")
   L.close()
 
 main()
