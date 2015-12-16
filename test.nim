@@ -226,6 +226,19 @@ proc genePPB(a: pointer): PPGene =
 proc intPPB(a: pointer): ptr ptr GENE =
   result = cast[ptr ptr GENE](a)
   
+type
+  arango = range[0..10]
+  brango = range[5..100]
+  
+proc trangA(a: arango): brango  =
+  result = a + 5
+  
+proc trangB(a: range[1..7], b: range[0..8]): range[0..100] =
+  result = a + b
+  
+proc trangC(a, b: int): range[5..50] =
+  result = a + b + 5
+
 proc main() =
   var L = newNimLua()
 
@@ -235,144 +248,144 @@ proc main() =
   L.bindEnum(GENE -> "DNA", ATOM -> GLOBAL, FRUIT)
   L.test("scoped_and_global_enum.lua")
   
-  #L.bindEnum:
-  #  ATOM
-  #  GENE
-  #  FRUIT
-  #  `poncho`
-  #L.test("scoped_enum.lua")
-  #
-  #L.bindFunction(mulv, tpc, tpm -> "goodMan")
-  #L.test("free_function.lua")
-  #
-  #L.bindFunction("gum"):
-  #  mulv
-  #  tpc
-  #  tpm -> "goodMan"
-  #  `++`
-  #L.test("scoped_function.lua")
-  #
-  #L.bindConst:
-  #  MANGOES
-  #  PAPAYA
-  #  LEMON
-  #  MAX_DASH_PATTERN
-  #  CATHODE
-  #  ANODE
-  #
-  #L.bindConst("mmm"):
-  #  ELECTRON16
-  #  PROTON16
-  #  ELECTRON32
-  #  PROTON32
-  #  ELECTRON64
-  #  PROTON64
-  #  connected
-  #
-  #L.bindConst("ccc"):
-  #  LABEL_STYLE_CH
-  #  INFO_FIELD
-  #  STAIR
-  #  HELIX
-  #  GREET
-  #  mime
-  #  programme
-  #
-  #L.bindConst:
-  #  MANGOES -> "MANGGA"
-  #  PAPAYA -> "PEPAYA"
-  #  LEMON -> "JERUK"
-  #
-  #L.bindConst("buah"):
-  #  MANGOES -> "MANGGA"
-  #  PAPAYA -> "PEPAYA"
-  #  LEMON -> "JERUK"
-  #L.test("constants.lua")
-  #
-  #L.bindObject(Foo):
-  #  newFoo -> constructor
-  #  addv
-  #  addk -> "add"
-  #  setAcid2
-  #  setAcid
-  #  newFoo
-  #  newFoo -> "whatever"
-  #L.test("fun.lua")
-  #
-  #L.bindFunction("mac"):
-  #  machine
-  #L.test("ov_func.lua")
-  #
-  #L.bindObject(Acid):
-  #  makeAcid -> constructor
-  #  setLen
-  #  getLen
-  #
-  #L.bindFunction("acd"):
-  #  makeAcid
-  #
-  #L.bindFunction(makeAcid)
-  #L.bindObject(Fish):
-  #  fishing -> constructor
-  #
-  #L.bindObject(Fish):
-  #  grill
-  #  fry
-  #
-  #L.bindFunction("gem", mining)
-  #L.bindFunction("gem", polish)
-  #L.bindConst("gem", ANODE)
-  #
-  #L.bindObject(Fish -> "kakap"):
-  #  grill
-  #  fry
-  #L.test("regular_object.lua")
-  #
-  #L.bindFunction(GLOBAL):
-  #  mulv
-  #  
-  #L.bindFunction("GLOBAL", mulv, subb)
-  #  
-  #L.bindConst(GLOBAL):
-  #  LEMON
-  #  
-  #L.bindConst("GLOBAL"):
-  #  LEMON
-  #  
-  #L.bindEnum:
-  #  GENE -> GLOBAL
-  #  FRUIT -> "GLOBAL"
-  #L.test("namespace.lua")
-  #
-  #L.bindFunction("arr"):
-  #  chemA
-  #  geneA
-  #  fruitA
-  #  geneB
-  #  geneC
-  #  fruitC
-  #  chemC
-  #L.test("array_param_ret.lua")
-  #
-  #L.bindFunction("proto_banana"):
-  #  fruitE -> "radiate"
-  #L.test("enum_param_ret.lua")
-  #
-  #L.bindFunction("set"):
-  #  fruitS
-  #  alphaS
-  #  fruitSA
-  #  alphaSA
-  #L.test("set_param_ret.lua")
+  L.bindEnum:
+    ATOM
+    GENE
+    FRUIT
+    `poncho`
+  L.test("scoped_enum.lua")
   
-  #L.bindFunction("seq"):
-  #  fruitQ
-  #  fruitQA
-  #  geneQ
-  #  geneQA
-  #  stringQ
-  #  stringQA
-  #L.test("sequence_param_ret.lua")
+  L.bindFunction(mulv, tpc, tpm -> "goodMan")
+  L.test("free_function.lua")
+  
+  L.bindFunction("gum"):
+    mulv
+    tpc
+    tpm -> "goodMan"
+    `++`
+  L.test("scoped_function.lua")
+  
+  L.bindConst:
+    MANGOES
+    PAPAYA
+    LEMON
+    MAX_DASH_PATTERN
+    CATHODE
+    ANODE
+  
+  L.bindConst("mmm"):
+    ELECTRON16
+    PROTON16
+    ELECTRON32
+    PROTON32
+    ELECTRON64
+    PROTON64
+    connected
+  
+  L.bindConst("ccc"):
+    LABEL_STYLE_CH
+    INFO_FIELD
+    STAIR
+    HELIX
+    GREET
+    mime
+    programme
+  
+  L.bindConst:
+    MANGOES -> "MANGGA"
+    PAPAYA -> "PEPAYA"
+    LEMON -> "JERUK"
+  
+  L.bindConst("buah"):
+    MANGOES -> "MANGGA"
+    PAPAYA -> "PEPAYA"
+    LEMON -> "JERUK"
+  L.test("constants.lua")
+  
+  L.bindObject(Foo):
+    newFoo -> constructor
+    addv
+    addk -> "add"
+    setAcid2
+    setAcid
+    newFoo
+    newFoo -> "whatever"
+  L.test("fun.lua")
+  
+  L.bindFunction("mac"):
+    machine
+  L.test("ov_func.lua")
+  
+  L.bindObject(Acid):
+    makeAcid -> constructor
+    setLen
+    getLen
+  
+  L.bindFunction("acd"):
+    makeAcid
+  
+  L.bindFunction(makeAcid)
+  L.bindObject(Fish):
+    fishing -> constructor
+  
+  L.bindObject(Fish):
+    grill
+    fry
+  
+  L.bindFunction("gem", mining)
+  L.bindFunction("gem", polish)
+  L.bindConst("gem", ANODE)
+  
+  L.bindObject(Fish -> "kakap"):
+    grill
+    fry
+  L.test("regular_object.lua")
+  
+  L.bindFunction(GLOBAL):
+    mulv
+    
+  L.bindFunction("GLOBAL", mulv, subb)
+    
+  L.bindConst(GLOBAL):
+    LEMON
+    
+  L.bindConst("GLOBAL"):
+    LEMON
+    
+  L.bindEnum:
+    GENE -> GLOBAL
+    FRUIT -> "GLOBAL"
+  L.test("namespace.lua")
+  
+  L.bindFunction("arr"):
+    chemA
+    geneA
+    fruitA
+    geneB
+    geneC
+    fruitC
+    chemC
+  L.test("array_param_ret.lua")
+  
+  L.bindFunction("proto_banana"):
+    fruitE -> "radiate"
+  L.test("enum_param_ret.lua")
+  
+  L.bindFunction("set"):
+    fruitS
+    alphaS
+    fruitSA
+    alphaSA
+  L.test("set_param_ret.lua")
+  
+  L.bindFunction("seq"):
+    fruitQ
+    fruitQA
+    geneQ
+    geneQA
+    stringQ
+    stringQA
+  L.test("sequence_param_ret.lua")
   
   L.bindFunction("ptr"):
     seedP
@@ -385,6 +398,12 @@ proc main() =
     genePPB
     intPPB
   L.test("ptr_pointer.lua")
+  
+  L.bindFunction("range"):
+    trangA
+    trangB
+    trangC
+  L.test("range_param_ret.lua")
   
   L.close()
 

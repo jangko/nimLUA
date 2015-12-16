@@ -55,9 +55,8 @@ no need to remember complicated API, the API is simple but powerful
 | set[T] | table with unique element |
 | pointer | light user data |
 | ptr T | light user data |
+| range/subrange | integer |
 | tuple | ? under construction |
-| range/subrange | ? under construction |
-
 ---
 ##**HOW TO USE**
 

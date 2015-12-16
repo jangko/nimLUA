@@ -659,10 +659,12 @@ proc genPtrArg(nType: NimNode, i: int, procName: string): string {.compileTime.}
   let argType = $nType[0].toStrLit
   result = "cast[ptr $1](L.toUserData($2.cint))\n" % [argType, $i]
   
+proc genRangeArg(nType: NimNode, i: int, procName: string): string {.compileTime.} =
+  result = "L.checkInteger($1.cint).int\n" % [$i]
+  
 proc constructComplexArg(mType: NimNode, i: int, procName: string): string {.compileTime.} =
   if mType.kind == nnkSym:
     let nType = getImpl(mType.symbol)[2]
-    
     if nType.kind in {nnkObjectTy, nnkRefTy}:
       return checkUD(registerObject(mType), $i)
 
@@ -675,13 +677,13 @@ proc constructComplexArg(mType: NimNode, i: int, procName: string): string {.com
     if nType.kind == nnkBracketExpr:
       if $nType[0] == "array":
         return genArrayArg(nType, i, procName)
-        
       if $nType[0] == "set":
         return genSetArg(nType, i, procName)
-
       if $nType[0] == "seq":
         return genSequenceArg(nType, i, procName)
-    
+      if $nType[0] == "range":
+        return genRangeArg(nType, i, procName)
+        
     if nType.kind == nnkPtrTy:
       return genPtrArg(nType, i, procName)
       
@@ -692,12 +694,12 @@ proc constructComplexArg(mType: NimNode, i: int, procName: string): string {.com
   if mType.kind == nnkBracketExpr:
     if $mType[0] == "array":
       return genArrayArg(mType, i, procName)
-      
     if $mType[0] == "set":
       return genSetArg(mType, i, procName)
-      
     if $mType[0] == "seq":
       return genSequenceArg(mType, i, procName)
+    if $mType[0] == "range":
+      return genRangeArg(mType, i, procName)
         
   if mType.kind == nnkPtrTy:
     return genPtrArg(mType, i, procName)
@@ -811,6 +813,8 @@ proc constructComplexRet(mType: NimNode, procCall, indent, procName: string): st
         return genSetRet(nType, procCall, indent, procName)
       if $nType[0] == "seq":
         return genSequenceRet(nType, procCall, indent, procName)
+      if $nType[0] == "range":
+        return indent & "L.pushInteger(lua_Integer(" & procCall & "))\n"
         
     if nType.kind in {nnkObjectTy, nnkRefTy}:
       let subjectName = registerObject(mType)
@@ -844,6 +848,8 @@ proc constructComplexRet(mType: NimNode, procCall, indent, procName: string): st
       return genSetRet(mType, procCall, indent, procName)
     if $mType[0] == "seq":
       return genSequenceRet(mType, procCall, indent, procName)
+    if $mType[0] == "range":
+      return indent & "L.pushInteger(lua_Integer(" & procCall & "))\n"
         
   if mType.kind == nnkVarTy:
     if getType(mType[0]).kind in {nnkObjectTy, nnkRefTy}:
