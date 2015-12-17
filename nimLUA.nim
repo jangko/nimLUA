@@ -1032,7 +1032,7 @@ proc bindSingleFunction(ctx: proxyDesc, n: NimNode, glueProc, procName: string):
 
   result = glue
 
-proc genBasicCheck(mType: NimNode, i: int): string {.compileTime.} =
+proc genBasicCheck(mType: NimNode, i: int, procNane: string): string {.compileTime.} =
   let argType = $mType
   for c in intTypes:
     if c == argType:
@@ -1054,31 +1054,82 @@ proc genBasicCheck(mType: NimNode, i: int): string {.compileTime.} =
   if argType == "char":
     return "(L.isInteger(" & $i & ") == 1)"
 
+  if argType == "pointer":
+    return "(L.isUserData(" & $i & ") == 1)"
+    
   result = ""
 
-proc genComplexCheck(mType: NimNode, i: int): string {.compileTime.} =
+proc genCheckType(mType: NimNode, i: int, procName: string): string {.compileTime.}
+
+proc genComplexCheck(mType: NimNode, i: int, procName: string): string {.compileTime.} =
+  if mType.kind == nnkSym:
+    let nType = getImpl(mType.symbol)[2]
+    if nType.kind in {nnkObjectTy, nnkRefTy}:
+      return "(L.isUserData(" & $i & ") == 1)"
+
+    if nType.kind == nnkDistinctTy:
+      return genCheckType(nType, i, procName)
+
+    if nType.kind == nnkEnumTy:
+      return "(L.isInteger(" & $i & ") == 1)"
+
+    if nType.kind == nnkBracketExpr:
+      if $nType[0] == "array":
+        return "L.isTable(" & $i & ")"
+      if $nType[0] == "set":
+        return "L.isTable(" & $i & ")"
+      if $nType[0] == "seq":
+        return "L.isTable(" & $i & ")"
+      if $nType[0] == "range":
+        return "L.isTable(" & $i & ")"
+
+    if nType.kind == nnkPtrTy:
+      return "(L.isLightUserData(" & $i & ") == 1)"
+
+    if nType.kind == nnkSym:
+      if $nType == "pointer":
+        return "(L.isLightUserData(" & $i & ") == 1)"
+
+  if mType.kind == nnkBracketExpr:
+    if $mType[0] == "array":
+      return "L.isTable(" & $i & ")"
+    if $mType[0] == "set":
+      return "L.isTable(" & $i & ")"
+    if $mType[0] == "seq":
+      return "L.isTable(" & $i & ")"
+    if $mType[0] == "range":
+      return "(L.isInteger(" & $i & ") == 1)"
+
+  if mType.kind == nnkPtrTy:
+    return "(L.isLightUserData(" & $i & ") == 1)"
+
   if mType.kind == nnkVarTy:
-    if getType(mType[0]).kind == nnkSym:
-      return genBasicCheck(mType[0], i)
-
-  
-  error("genComplexCheck: unknown param type: " & $mType.kind & "\n" & mType.treeRepr)
+    let nType = getType(mType[0])
+    if nType.kind in {nnkObjectTy, nnkRefTy}:
+      return "(L.isUserData(" & $i & ") == 1)"
+    if nType.kind == nnkSym:
+      return genCheckType(nType, i, procName)
+    
+  if mType.kind == nnkEnumTy:
+    return "(L.isInteger(" & $i & ") == 1)"
+    
+  error(procName & " : unknown param type: " & $mType.kind & "\n" & mType.treeRepr)
   result = ""
 
-proc genCheckType(mName, mType: NimNode, i: int): string {.compileTime.} =
+proc genCheckType(mType: NimNode, i: int, procName: string): string =
   case mType.kind:
   of nnkSym:
-    result = genBasicCheck(mType, i)
-    if result == "": result = genComplexCheck(mType, i)
+    result = genBasicCheck(mType, i, procName)
+    if result == "": result = genComplexCheck(mType, i, procName)
   else:
-    result = genComplexCheck(mType, i)
+    result = genComplexCheck(mType, i, procName)
 
 #second level of ov proc resolution
-proc genCheck(params: seq[argDesc], flags: ovFlags): string {.compileTime.} =
+proc genCheck(params: seq[argDesc], flags: ovFlags, procName: string): string {.compileTime.} =
   var glue = "    if "
   let start = if ovfUseObject in flags: 1 else: 0
   for i in start..params.len-1:
-    glue.add genCheckType(params[i].mName, params[i].mType, i + 1)
+    glue.add genCheckType(params[i].mType, i + 1, procName)
     if i < params.len-1:
       glue.add " and "
     else:
@@ -1090,7 +1141,7 @@ proc genCheck(params: seq[argDesc], flags: ovFlags): string {.compileTime.} =
 proc genOvCallMany(ctx: proxyDesc, ovp: seq[ovProcElem], procName: string, flags: ovFlags): string {.compileTime.} =
   var glue = ""
   for ov in ovp:
-    glue.add genCheck(ov.params, flags)
+    glue.add genCheck(ov.params, flags, procName)
     glue.add genOvCallSingle(ctx, ov, procName, "    ", flags)
   result = glue
 

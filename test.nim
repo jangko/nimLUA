@@ -239,6 +239,22 @@ proc trangB(a: range[1..7], b: range[0..8]): range[0..100] =
 proc trangC(a, b: int): range[5..50] =
   result = a + b + 5
 
+  
+type
+  Car = ref object
+    speed: int
+    
+  Bike = object
+    wheel: int
+    
+  OIL = enum
+    GREASE, LUBRICANT, PETROLEUM, GASOLINE, KEROSENE
+    
+  oilArray = array[0..11, OIL]
+  oilSet = set[OIL]
+  Poil = ptr OIL
+  roil = range[5..10]
+    
 proc main() =
   var L = newNimLua()
 
