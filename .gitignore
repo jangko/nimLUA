@@ -1,2 +1,4 @@
 nimcache/
 nimPDF/
+bug/
+*.exe

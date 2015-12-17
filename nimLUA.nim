@@ -236,15 +236,25 @@ proc getAccQuotedName(n: NimNode, kind: NimNodeKind): string {.compileTime.} =
   let name = if n.kind == nnkClosedSymChoice: $n[0] else: $n
   if kind == nnkAccQuoted: result = "`" & name & "`" else: result = name
   
+proc ignoreGenerics(ids: var seq[string], id: string, generics: NimNode) {.compileTime.} =
+  var found = false
+  if generics.kind == nnkGenericParams:
+    for k in generics:
+      if $k == id:
+        found = true
+        break
+  if not found: ids.add id
+
 proc collectSym(ids: var seq[string], arg: NimNode) {.compileTime.} =
   if arg.kind == nnkProcDef:
+    let generics = arg[2]
     let params  = arg[3]
     let retType = params[0]
     let argList = paramsToArgList(params)
-    if retType.kind == nnkIdent: ids.add($retType)
+    if retType.kind == nnkIdent: ignoreGenerics(ids, $retType, generics)
     for k in argList:
-      if k.mType.kind == nnkIdent: ids.add($k.mType)
-      if k.mVal.kind == nnkIdent: ids.add($k.mVal)
+      if k.mType.kind == nnkIdent: ignoreGenerics(ids, $k.mType, generics)
+      if k.mVal.kind == nnkIdent: ignoreGenerics(ids, $k.mVal, generics)
   
 proc proxyMixer*(ctx: proxyDesc, proxyName: string): NimNode {.compileTime.} =
   var ids = newSeq[string]()
@@ -296,6 +306,7 @@ proc proxyMixer*(ctx: proxyDesc, proxyName: string): NimNode {.compileTime.} =
     
   nlb.add "  result = bind$1Impl(ctx)\n" % [proxyName]
   nlb.add macroName & "()\n"
+  
   result = parseCode(nlb)
   inc macroCount
   
@@ -796,6 +807,9 @@ proc constructComplexArg(ctx: proxyDesc, mType: NimNode, i: int, procName: strin
       outValList.add constructBasicRet(nType, "arg" & $(i-1), "", procName)
       return constructBasicArg(nType, i, procName)
     
+  if mType.kind == nnkEnumTy:
+    return "L.checkInteger($1.cint).$2\n" % [$i, $mType[0]]
+    
   error(procName & ": unknown param type: " & $mType.kind & "\n" & mType.treeRepr)
   result = ""
 
@@ -964,9 +978,8 @@ proc constructRet(retType: NimNode, procCall, indent, procName: string): string 
     result = constructComplexRet(retType, procCall, indent, procName)
 
 proc findSymbol(ctx: proxyDesc, s: NimNode): NimNode =
-  echo getType(s).treeRepr
   for k in ctx.symList:
-    if $s == $k: return getImpl(k.symbol)
+    if $s == $k: return getType(k)
   result = newEmptyNode()
   
 proc genOvCallSingle(ctx: proxyDesc, ovp: ovProcElem, procName, indent: string, flags: ovFlags): string {.compileTime.} =
@@ -977,7 +990,7 @@ proc genOvCallSingle(ctx: proxyDesc, ovp: ovProcElem, procName, indent: string, 
 
   for i in start..ovp.params.len-1:
     let param = ovp.params[i]
-    let pType = if param.mType.kind != nnkEmpty: param.mType else: findSymbol(ctx, param.mName)
+    let pType = if param.mType.kind != nnkEmpty: param.mType else: findSymbol(ctx, param.mVal)
     glue.add indent & "  var arg" & $i & " = " & constructArg(ctx, pType, i + 1, procName)
     glueParam.add "arg" & $i & argAttr(param.mType)
     if i < ovp.params.len-1: glueParam.add ", "
@@ -1048,6 +1061,7 @@ proc genComplexCheck(mType: NimNode, i: int): string {.compileTime.} =
     if getType(mType[0]).kind == nnkSym:
       return genBasicCheck(mType[0], i)
 
+  
   error("genComplexCheck: unknown param type: " & $mType.kind & "\n" & mType.treeRepr)
   result = ""
 
