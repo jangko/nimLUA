@@ -141,13 +141,12 @@ proc unwindList(arg: NimNode, elemList: var seq[bindDesc]) {.compileTime.} =
       error("wrong param type")
 
 proc checkDuplicate(list: seq[bindDesc]): string {.compileTime.} =
-  var checked = newSeq[string]()
+  var checked = newSeq[bindDesc]()
   for k in list:
-    let name = $k.node
-    if checked.contains(name):
-      return name
+    if checked.contains(k):
+      return $k.node
     else:
-      checked.add name
+      checked.add k
   result = ""
 
 #here is the factory of second level macro that will be expanded to utilize bindSym

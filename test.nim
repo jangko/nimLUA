@@ -418,6 +418,7 @@ proc main() =
   L.bindFunction("range"):
     trangA
     trangB
+    trangC -> "haha"
     trangC
   L.test("range_param_ret.lua")
   
