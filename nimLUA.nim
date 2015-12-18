@@ -140,6 +140,16 @@ proc unwindList(arg: NimNode, elemList: var seq[bindDesc]) {.compileTime.} =
     else:
       error("wrong param type")
 
+proc checkDuplicate(list: seq[bindDesc]): string {.compileTime.} =
+  var checked = newSeq[string]()
+  for k in list:
+    let name = $k.node
+    if checked.contains(name):
+      return name
+    else:
+      checked.add name
+  result = ""
+
 #here is the factory of second level macro that will be expanded to utilize bindSym
 proc genProxyMacro(arg: NimNode, opts: bindFlags, proxyName: string): NimNode {.compileTime.} =
   let
@@ -195,6 +205,10 @@ proc genProxyMacro(arg: NimNode, opts: bindFlags, proxyName: string): NimNode {.
   if luaCtx == "":
     error("need luaState as first param")
 
+  let dup = elemList.checkDuplicate()
+  if dup != "":
+    error("bind$1 detected duplicated entries: $2" % [proxyName, dup])
+    
   #generate intermediate macro to utilize bindSym that can only accept string literal
   let macroName = "NLB$1$2" % [proxyName, $macroCount]
   var nlb = "macro " & macroName & "(): stmt =\n"

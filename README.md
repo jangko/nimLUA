@@ -26,6 +26,7 @@ glue code generator to bind Nim and Lua together using Nim's powerful macro
 * complex data types conversion, at least standard container
 * properties getter/setter
 * closure binding
+* generic proc binding
 * access Lua code/data from Nim
 
 - - -
@@ -57,6 +58,7 @@ no need to remember complicated API, the API is simple but powerful
 | ptr T | light user data |
 | range/subrange | integer |
 | tuple | ? under construction |
+| openArray[T] | not supported |
 ---
 ##**HOW TO USE**
 

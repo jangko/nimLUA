@@ -1,4 +1,5 @@
 import nimLUA, "nimPDF/nimBMP", "nimPDF/nimAES", "nimPDF/nimSHA2", streams, "nimPDF/nimPDF"
+import basic2d
 
 proc main() =
   var L = newNimLua()
@@ -70,6 +71,85 @@ proc main() =
     setFont
     addPage
     writePDF
-    
+    drawText
+    drawVText
+    beginText
+    moveTextPos
+    setTextRenderingMode
+    setTextMatrix
+    showText
+    setTextLeading
+    moveToNextLine
+    endText
+    setCharSpace
+    setTextHScale
+    setWordSpace
+    setTransform
+    rotate
+    move
+    scale
+    stretch
+    skew
+    toUser
+    fromUser
+    drawImage
+    drawRect
+    moveTo
+    lineTo
+    bezierCurveTo
+    curveTo1
+    curveTo2
+    closePath
+    roundRect
+    drawEllipse
+    drawCircle
+    setLineWidth
+    setLineCap
+    setLineJoin
+    setMiterLimit
+    setGrayFill
+    setGrayStroke
+    setRGBFill
+    setRGBStroke
+    setCMYKFill
+    setCMYKStroke
+    setAlpha
+    setBlendMode
+    saveState
+    restoreState
+    getTextWidth
+    getTextHeight
+    clip
+    executePath
+    drawBounds
+    fill
+    stroke
+    fillAndStroke
+    setGradientFill
+    makeXYZDest
+    makeFitDest
+    makeFitHDest
+    makeFitVDest
+    makeFitRDest
+    makeFitBDest
+    makeFitBHDest
+    makeFitBVDest
+    makeOutline
+    linkAnnot
+    textAnnot
+    setPassword
+    setEncryptionMode
+    initAcroForm
+    textField
+    #drawArc
+    #arcTo
 
+#setDash
+#proc setFontColor*(a: AcroForm, r,g,b: float64) =
+#proc setFontSize*(a: AcroForm, size: float64) =
+#proc setFontFamily*(a: AcroForm, family: string) =
+#proc setFontStyle*(a: AcroForm, style: FontStyles) =
+#proc setEncoding*(a: AcroForm, enc: EncodingType) =  
+
+  
 main()
