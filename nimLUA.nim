@@ -36,12 +36,19 @@ type
     rhsKind: NimNodeKind  #op '->' rhs kind, it could be nnkNone or nnkStrLit or nnkIdent
   ]
 
+  propDesc = tuple [
+    name: string,
+    getter: bool,
+    setter: bool
+  ]
+  
   proxyDesc* = object
     luaCtx*  : string
     libName* : NimNode
     subject* : NimNode
     bindList*: seq[bindDesc] 
     symList* : seq[NimNode]
+    propList*: seq[propDesc]
     
   argDesc = object
     mName, mType, mVal: NimNode
@@ -106,26 +113,30 @@ proc paramsToArgList(params: NimNode): seq[argDesc] {.compileTime.} =
   result = argList
   
 #split something like 'ident -> "newName"' into tuple
-proc splitElem(n: NimNode): bindDesc {.compileTime.} =
+proc splitElem(n: NimNode, opts: bindFlags, proxyName: string): bindDesc {.compileTime.} =
   let
     op  = n[0]
     lhs = n[1]
     rhs = n[2]
+    registerObject = nlbRegisterobject in opts
 
   if $op != "->":
     error("wrong operator, must be '->' and not '" & $op & "'")
-  if lhs.kind notin {nnkIdent, nnkAccQuoted}:
+  if lhs.kind notin {nnkIdent, nnkAccQuoted, nnkCall}:
     error("param must be an identifier and not " & $lhs.kind)
+  if not registerObject and lhs.kind == nnkCall:
+    error("getter/setter not available in bind$1" % [proxyName])
   if rhs.kind notin {nnkStrLit, nnkIdent}:
     error("alias must be string literal and not " & $rhs.kind)
 
   if lhs.kind == nnkAccQuoted:
-    result = (lhs[0], $rhs, nnkAccQuoted, rhs.kind)
+    result = (lhs[0], $rhs, lhs.kind, rhs.kind)
   else:
-    result = (lhs, $rhs, nnkIdent, rhs.kind)
+    result = (lhs, $rhs, lhs.kind, rhs.kind)
 
 #helper proc to flatten nnkStmtList
-proc unwindList(arg: NimNode, elemList: var seq[bindDesc]) {.compileTime.} =
+proc unwindList(arg: NimNode, elemList: var seq[bindDesc], opts: bindFlags, proxyName: string) {.compileTime.} =
+  let registerObject = nlbRegisterobject in opts
   for i in 0..arg.len-1:
     let n = arg[i]
     case n.kind:
@@ -136,7 +147,12 @@ proc unwindList(arg: NimNode, elemList: var seq[bindDesc]) {.compileTime.} =
       let elem = (node: n[0], name: "`" & $n[0] & "`", lhsKind: n.kind, rhsKind: nnkNone)
       elemList.add elem
     of nnkInfix:
-      elemList.add splitElem(n)
+      elemList.add splitElem(n, opts, proxyName)
+    of nnkCall:
+      if not registerObject:
+        error("getter/setter not available in bind$1" % [proxyName])
+      let elem = (node: n, name: $n[0], lhsKind: n.kind, rhsKind: nnkNone)
+      elemList.add elem
     else:
       error("wrong param type")
 
@@ -162,6 +178,7 @@ proc genProxyMacro(arg: NimNode, opts: bindFlags, proxyName: string): NimNode {.
     objectName = ""
     objectNewName = ""
     elemList = newSeq[bindDesc]()
+    propList = newSeq[propDesc]()
 
   for i in 0..arg.len-1:
     let n = arg[i]
@@ -191,13 +208,18 @@ proc genProxyMacro(arg: NimNode, opts: bindFlags, proxyName: string): NimNode {.
       elemList.add elem
     of nnkInfix:
       if registerObject and i == 1:
-        let k = splitElem(n)
+        let k = splitElem(n, opts, proxyName)
         objectName = $k.node
         objectNewName = k.name
       else:
-        elemList.add splitElem(n)
+        elemList.add splitElem(n, opts, proxyName)
+    of nnkCall:
+      if not registerObject:
+        error("getter/setter not available in bind$1" % [proxyName])
+      let elem = (node: n, name: $n[0], lhsKind: n.kind, rhsKind: nnkNone)
+      elemList.add elem
     of nnkStmtList:
-      unwindList(n, elemList)
+      unwindList(n, elemList, opts, proxyName)
     else:
       error("wrong param type\n" & n.treeRepr)
 
@@ -218,17 +240,46 @@ proc genProxyMacro(arg: NimNode, opts: bindFlags, proxyName: string): NimNode {.
   else:
     nlb.add "  ctx.subject = newEmptyNode()\n"
 
-  if elemList.len > 0:
+  var numElem = 0
+  for k in elemList:
+    if k.node.kind in {nnkAccQuoted, nnkIdent}:
+      inc numElem
+    elif k.node.kind == nnkCall:
+      var v = (name: $k.node[0], getter: false, setter: false)
+      for i in 1..k.node.len-1:
+        let n = k.node[i]
+        if n.kind != nnkIdent: error(v.name & ": getter/setter attribut must be identifier")
+        if $n == "get": v.getter = true
+        elif $n == "set": v.setter = true
+        else: error(v.name & ": getter/setter attribute must be 'get' and/or 'set'")  
+      if v.getter == false and v.setter == false: error(v.name & ": getter/setter attribute must be present")
+      propList.add v
+    else:
+      error("unexpected node kind: " & $k.node.kind)
+  
+  if numElem > 0:
     nlb.add "  ctx.bindList = @[\n"
     var i = 0
     for k in elemList:
-      let comma = if i < elemList.len-1: "," else: ""
-      nlb.add "    (bindSym\"$1\", \"$2\", $3, $4)$5\n" % [$k.node, k.name, $k.lhsKind, $k.rhsKind, comma]
+      let comma = if i < numElem-1: "," else: ""
+      if k.node.kind in {nnkAccQuoted, nnkIdent}:
+        nlb.add "    (bindSym\"$1\", \"$2\", $3, $4)$5\n" % [$k.node, k.name, $k.lhsKind, $k.rhsKind, comma]
       inc i
     nlb.add "  ]\n"
   else:
     nlb.add "  ctx.bindList = @[]\n"
 
+  if propList.len > 0:
+    nlb.add "  ctx.propList = @[\n"
+    var ii = 0
+    for k in propList:
+      let comma = if ii < propList.len-1: "," else: ""
+      nlb.add "    (\"$1\", $2, $3)$4\n" % [k.name, $k.getter, $k.setter, comma]
+      inc ii
+    nlb.add "  ]\n"
+  else:
+    nlb.add "  ctx.propList = @[]\n"
+  
   if libKind == nnkStrLit:
     nlb.add "  ctx.libName = newStrLitNode(\"$1\")\n" % [libName]
   elif libKind == nnkIdent:
@@ -269,6 +320,20 @@ proc collectSym(ids: var seq[string], arg: NimNode) {.compileTime.} =
       if k.mType.kind == nnkIdent: ignoreGenerics(ids, $k.mType, generics)
       if k.mVal.kind == nnkIdent: ignoreGenerics(ids, $k.mVal, generics)
   
+proc checkProp(subject: NimNode, prop: string): bool {.compileTime.} =
+  let recList = subject[2][2]
+  for n in recList:
+    if n[0].kind == nnkIdent:
+      if $n[0] == prop: return true
+    elif n[0].kind == nnkPostfix:
+      if $n[0][1] == prop: return true
+    else:
+      error("unknown prop construct")
+  result = false
+
+proc checkObject(subject: NimNode): bool {.compileTime.} =
+  result = subject[2].kind in {nnkObjectTy, nnkRefTy}
+
 proc proxyMixer*(ctx: proxyDesc, proxyName: string): NimNode {.compileTime.} =
   var ids = newSeq[string]()
   
@@ -284,6 +349,9 @@ proc proxyMixer*(ctx: proxyDesc, proxyName: string): NimNode {.compileTime.} =
   nlb.add "  var ctx: proxyDesc\n"
   nlb.add "  ctx.luaCtx = \"$1\"\n" % [ctx.luaCtx]
   if ctx.subject.kind == nnkSym:
+    let subject = getImpl(ctx.subject.symbol)
+    if not checkObject(subject):
+      error($ctx.subject & ": not an object")
     nlb.add "  ctx.subject = bindSym\"$1\"\n" % [$ctx.subject]
   else:
     nlb.add "  ctx.subject = newEmptyNode()\n"
@@ -299,6 +367,21 @@ proc proxyMixer*(ctx: proxyDesc, proxyName: string): NimNode {.compileTime.} =
   else:
     nlb.add "  ctx.bindList = @[]\n"
 
+  if ctx.propList.len > 0:
+    nlb.add "  ctx.propList = @[\n"
+    var ii = 0
+    let subject = getImpl(ctx.subject.symbol)
+    for k in ctx.propList:
+      if not checkProp(subject, k.name):
+        error($ctx.subject & ": don't have properties " & k.name)
+      let comma = if ii < ctx.propList.len-1: "," else: ""
+      nlb.add "    (\"$1\", $2, $3)$4\n" % [k.name, $k.getter, $k.setter, comma]
+      inc ii
+    nlb.add "  ]\n"
+  else:
+    nlb.add "  ctx.propList = @[]\n"
+
+    
   if ids.len > 0:
     nlb.add "  ctx.symList = @[\n"
     var i = 0
@@ -1190,7 +1273,7 @@ proc bindOverloadedFunction(ctx: proxyDesc, ov: NimNode, glueProc, procName: str
   result = glue
 
 #this proc is exported because of the NLBFunc macro expansion occured on bindFunction caller module
-proc bindFuncImpl*(ctx: proxyDesc): NimNode {.compileTime.} =
+proc bindFunctionImpl*(ctx: proxyDesc): NimNode {.compileTime.} =
   let
     SL = ctx.luaCtx
     libName = if ctx.libName.kind != nnkEmpty: $ctx.libName else: ""
@@ -1240,10 +1323,10 @@ proc bindFuncImpl*(ctx: proxyDesc): NimNode {.compileTime.} =
 #     -> export nim function(s) to lua global scope
 
 macro bindFunction*(arg: varargs[untyped]): stmt =
-  result = genProxyMacro(arg, {nlbUSeLib}, "Func")
+  result = genProxyMacro(arg, {nlbUSeLib}, "Function")
 
 macro bindProc*(arg: varargs[untyped]): stmt =
-  result = genProxyMacro(arg, {nlbUSeLib}, "Func")
+  result = genProxyMacro(arg, {nlbUSeLib}, "Function")
 
 # ----------------------------------------------------------------------
 # ----------------------------- bindConst ------------------------------
