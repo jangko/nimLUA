@@ -11,6 +11,7 @@ glue code generator to bind Nim and Lua together using Nim's powerful macro
 * bind const
 * bind enum
 * bind object
+* generic proc binding
 * automatic resolve overloaded proc
 * easy namespace creation
 * easy debugging
@@ -26,7 +27,6 @@ glue code generator to bind Nim and Lua together using Nim's powerful macro
 * complex data types conversion, at least standard container
 * properties getter/setter
 * closure binding
-* generic proc binding
 * access Lua code/data from Nim
 
 - - -
@@ -58,7 +58,8 @@ no need to remember complicated API, the API is simple but powerful
 | ptr T | light user data |
 | range/subrange | integer |
 | tuple | ? under construction |
-| openArray[T] | not supported |
+| openArray[T] | ? under construction |
+| varargs[T] | not supported |
 ---
 ##**HOW TO USE**
 
@@ -325,6 +326,43 @@ assert(b == 25)
 ```
 
 basically, outval will become retval, FIFO ordered
+
+##**GENERIC PROC BINDING**
+```nimrod
+proc mew[T, K](a: T, b: K): T =
+  discard
+  
+L.bindFunction:
+  mew[int, string]
+  mew[int, string] -> "mewt"
+```
+
+##**CLOSURE BINDING**
+```nimrod
+proc main() =
+  ...
+  
+  var test = 1237
+    proc cl() =
+      echo test
+      
+    L.bindFunction:
+      [cl]
+      [cl] -> "clever"
+```
+
+##**GETTER/SETTER**
+```nimrod
+type
+  Ship = object
+    speed*: int
+    power: int
+    
+  L.bindObject(Ship):
+    speed(set)
+    speeg(get) -> "getter"
+    speed(get, set) -> "cepat"
+```
 
 ##**HOW TO DEBUG**
 

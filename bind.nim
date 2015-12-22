@@ -69,7 +69,6 @@ proc main() =
     getCoordinateMode
     getSize
     setFont
-    addPage
     writePDF
     drawText
     drawVText
@@ -141,15 +140,18 @@ proc main() =
     setEncryptionMode
     initAcroForm
     textField
+    
+    #addPage
     #drawArc
     #arcTo
-
-#setDash
-#proc setFontColor*(a: AcroForm, r,g,b: float64) =
-#proc setFontSize*(a: AcroForm, size: float64) =
-#proc setFontFamily*(a: AcroForm, family: string) =
-#proc setFontStyle*(a: AcroForm, style: FontStyles) =
-#proc setEncoding*(a: AcroForm, enc: EncodingType) =  
+    #setDash
+    
+  L.bindObject(AcroForm):
+    setFontColor
+    setFontSize
+    setFontFamily
+    setFontStyle
+    setEncoding
 
   
 main()
