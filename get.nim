@@ -18,14 +18,11 @@ proc main() =
   L.bindObject(Ship):
     speed(set)
     speed(get, set) -> "cepat"
-    
-  #prop accquoted
-  #closure accquoted
-  #generic accquoted
+  
   L.bindFunction:
     # [cl]
     # [cl] -> "clever"
-    mew[int]
+    mew[int, int]
     mew[int, string] -> "mewt"
   
   L.close()

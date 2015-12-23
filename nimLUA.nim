@@ -95,7 +95,22 @@ var
   nameList   {.compileTime.} = newSeq[string]()
   outValList {.compileTime.} : seq[string]
   gContext   {.compileTime.} = ""
+  gOptions   {.compileTime.} = {nloAddMember}
 
+proc convOpt(a: NimNode): nlOptions {.compileTime.} =
+  case $a:
+  of "nloDebug": result = nloDebug
+  of "nloAddMember": result = nloAddMember
+  else: result = nloNone
+  
+macro nimLuaOptions*(opt: nlOptions, mode: bool): stmt =
+  if $mode == "true":
+    gOptions.incl convOpt(opt)
+  else:
+    gOptions.excl convOpt(opt)
+    
+  result = newEmptyNode()
+  
 #inside macro, const bool become nnkIntLit, that's why we need to use
 #this trick to test for bool type using 'when internalTestForBOOL(n)'
 proc internalTestForBOOL*[T](a: T): bool {.compileTime.} =
@@ -104,7 +119,7 @@ proc internalTestForBOOL*[T](a: T): bool {.compileTime.} =
 
 proc parseCode(s: string): NimNode {.compileTime.} =
   result = parseStmt(s)
-  #echo s
+  if nloDebug in gOptions: echo s
 
 #flatten formal param into seq
 proc paramsToArgListBasic(params: NimNode): seq[argDesc] {.compileTime.} =
@@ -595,7 +610,7 @@ proc newUD(s: string): string {.compileTime.} =
   result = "cast[ptr luaL_$1Proxy](L.newUserData(sizeof(luaL_$1Proxy)))\n" % [s]
 
 proc addMemberCap(SL, libName: string, argLen: int): string {.compileTime.} =
-  when true:
+  when nloAddMember in gOptions:
     var glue = ""
     glue.add "$1.getGlobal(\"$2\")\n" % [SL, libName]
     glue.add "if not $1.isTable(-1):\n" % [SL]
@@ -1240,13 +1255,13 @@ proc genOvCallSingle(ctx: proxyDesc, ovp: ovProcElem, procName, indent: string, 
       glue.add "$1  return $2\n" % [indent, $numRet]
   result = glue
 
-proc bindSingleFunction(ctx: proxyDesc, gp: seq[NimNode], n: NimNode, glueProc, procName: string): string {.compileTime.} =
+proc bindSingleFunction(ctx: proxyDesc, bd: bindDesc, n: NimNode, glueProc, procName: string): string {.compileTime.} =
   if n.kind != nnkProcDef:
     error("bindFunction: " & procName & " is not a proc")
 
   let params = n[3]
-  let retType = replaceRet(params[0], gp, n[2])
-  let argList = paramsToArgList(params, gp, n[2])
+  let retType = replaceRet(params[0], bd.genericParams, n[2])
+  let argList = paramsToArgList(params, bd.genericParams, n[2])
 
   var glue = "proc " & glueProc & "(L: PState): cint {.cdecl.} =\n"
   glue.add genOvCallSingle(ctx, newProcElem(retType, argList), procName, "", {ovfUseRet})
@@ -1377,7 +1392,7 @@ proc genOvCall(ctx: proxyDesc, ovp: seq[ovProc], procName: string, flags: ovFlag
       glue.add genOvCallMany(ctx, k.procs, procName, flags)
   result = glue
 
-proc bindOverloadedFunction(ctx: proxyDesc, gp: seq[NimNode], ov: NimNode, glueProc, procName: string): string {.compileTime.} =
+proc bindOverloadedFunction(ctx: proxyDesc, bd: bindDesc, ov: NimNode, glueProc, procName: string): string {.compileTime.} =
   var ovl = newSeq[ovProc]()
 
   for s in children(ov):
@@ -1386,8 +1401,8 @@ proc bindOverloadedFunction(ctx: proxyDesc, gp: seq[NimNode], ov: NimNode, glueP
       error("bindObject: " & procName & " is not a proc")
 
     let params = n[3]
-    let retType = replaceRet(params[0], gp, n[2])
-    let argList = paramsToArgList(params, gp, n[2])
+    let retType = replaceRet(params[0], bd.genericParams, n[2])
+    let argList = paramsToArgList(params, bd.genericParams, n[2])
     ovl.addOvProc(retType, argList)
 
   var glue = "proc " & glueProc & "(L: PState): cint {.cdecl.} =\n"
@@ -1422,9 +1437,9 @@ proc bindFunctionImpl*(ctx: proxyDesc): NimNode {.compileTime.} =
       exportedName = n.name
 
     if n.node.kind == nnkSym:
-      glue.add bindSingleFunction(ctx, n.genericParams, getImpl(n.node.symbol), glueProc, procName)
+      glue.add bindSingleFunction(ctx, n, getImpl(n.node.symbol), glueProc, procName)
     else: #nnkClosedSymChoice
-      glue.add bindOverloadedFunction(ctx, n.genericParams, n.node, glueProc, procName)
+      glue.add bindOverloadedFunction(ctx, n, n.node, glueProc, procName)
 
     if exportLib:
       glue.add "discard " & SL & ".pushString(\"" & exportedName & "\")\n"
@@ -1566,17 +1581,17 @@ macro bindConst*(arg: varargs[untyped]): stmt =
 # ----------------------------- bindObject ------------------------------
 # -----------------------------------------------------------------------
 
-proc bindSingleConstructor(ctx: proxyDesc, gp: seq[NimNode], n, subject: NimNode, glueProc, procName, subjectName: string): string {.compileTime.} =
+proc bindSingleConstructor(ctx: proxyDesc, bd: bindDesc, n, subject: NimNode, glueProc, procName, subjectName: string): string {.compileTime.} =
   if n.kind != nnkProcDef:
     error("bindFunction: " & procName & " is not a proc")
 
   let params = n[3]
-  let retType = replaceRet(params[0], gp, n[2])
+  let retType = replaceRet(params[0], bd.genericParams, n[2])
 
   if subject.kind != retType.kind and $subject != $retType:
     error("invalid constructor ret type")
 
-  let argList = paramsToArgList(params, gp, n[2])
+  let argList = paramsToArgList(params, bd.genericParams, n[2])
 
   var glue = "proc " & glueProc & "(L: PState): cint {.cdecl.} =\n"
   glue.add "  var proxy = " & newUD(subjectName)
@@ -1595,7 +1610,7 @@ proc eqType(a, b: NimNode): bool {.compileTime.} =
     if sameType(a, b[0]): return true
   result = sameType(a, b)
 
-proc bindOverloadedConstructor(ctx: proxyDesc, gp: seq[NimNode], ov, subject: NimNode, glueProc, procName, subjectName: string): string {.compileTime.} =
+proc bindOverloadedConstructor(ctx: proxyDesc, bd: bindDesc, ov, subject: NimNode, glueProc, procName, subjectName: string): string {.compileTime.} =
   var ovl = newSeq[ovProc]()
 
   for s in children(ov):
@@ -1604,8 +1619,8 @@ proc bindOverloadedConstructor(ctx: proxyDesc, gp: seq[NimNode], ov, subject: Ni
       error("bindObject: " & procName & " is not a proc")
 
     let params = n[3]
-    let retType = replaceRet(params[0], gp, n[2])
-    let argList = paramsToArgList(params, gp, n[2])
+    let retType = replaceRet(params[0], bd.genericParams, n[2])
+    let argList = paramsToArgList(params, bd.genericParams, n[2])
 
     #not a valid constructor
     if subject.kind != retType.kind and not eqType(subject, retType): continue
@@ -1623,16 +1638,16 @@ proc bindOverloadedConstructor(ctx: proxyDesc, gp: seq[NimNode], ov, subject: Ni
   glue.add "  result = 1\n"
   result = glue
 
-proc bindObjectSingleMethod(ctx: proxyDesc, gp: seq[NimNode], n, subject: NimNode, glueProc, procName, subjectName: string): string {.compileTime.} =
+proc bindObjectSingleMethod(ctx: proxyDesc, bd: bindDesc, n, subject: NimNode, glueProc, procName, subjectName: string): string {.compileTime.} =
   if n.kind != nnkProcDef:
     error("bindFunction: " & procName & " is not a proc")
 
   let params = n[3]
-  let retType = replaceRet(params[0], gp, n[2])
-  let argList = paramsToArgList(params, gp, n[2])
+  let retType = replaceRet(params[0], bd.genericParams, n[2])
+  let argList = paramsToArgList(params, bd.genericParams, n[2])
 
   if eqType(subject, retType):
-    return bindSingleConstructor(ctx, gp, n, subject, glueProc, procName, subjectName)
+    return bindSingleConstructor(ctx, bd, n, subject, glueProc, procName, subjectName)
 
   if argList.len == 0:
     error(procName & ": invalid object method")
@@ -1645,7 +1660,7 @@ proc bindObjectSingleMethod(ctx: proxyDesc, gp: seq[NimNode], n, subject: NimNod
   glue.add genOvCallSingle(ctx, newProcElem(retType, argList), procName, "", {ovfUseObject, ovfUseRet})
   result = glue
 
-proc bindObjectOverloadedMethod(ctx: proxyDesc, gp: seq[NimNode], ov, subject: NimNode, glueProc, procName, subjectName: string): string {.compileTime.} =
+proc bindObjectOverloadedMethod(ctx: proxyDesc, bd: bindDesc, ov, subject: NimNode, glueProc, procName, subjectName: string): string {.compileTime.} =
   var ovl = newSeq[ovProc]()
   var ovc = newNimNode(nnkClosedSymChoice)
 
@@ -1656,8 +1671,8 @@ proc bindObjectOverloadedMethod(ctx: proxyDesc, gp: seq[NimNode], ov, subject: N
       error("bindConstructor: " & procName & " is not a proc")
 
     let params = n[3]
-    let retType = replaceRet(params[0], gp, n[2])
-    let argList = paramsToArgList(params, gp, n[2])
+    let retType = replaceRet(params[0], bd.genericParams, n[2])
+    let argList = paramsToArgList(params, bd.genericParams, n[2])
 
     if eqType(subject, retType): #constructor like
       ovc.add s
@@ -1668,7 +1683,7 @@ proc bindObjectOverloadedMethod(ctx: proxyDesc, gp: seq[NimNode], ov, subject: N
     ovl.addOvProc(retType, argList)
 
   if ovc.len > 0:
-    glue.add bindOverloadedConstructor(ctx, gp, ovc, subject, glueProc, procName, subjectName)
+    glue.add bindOverloadedConstructor(ctx, bd, ovc, subject, glueProc, procName, subjectName)
     return glue
 
   glue.add "proc " & glueProc & "(L: PState): cint {.cdecl.} =\n"
@@ -1705,14 +1720,14 @@ proc bindObjectImpl*(ctx: proxyDesc): NimNode {.compileTime.} =
 
     if n.node.kind == nnkSym:
       if n.name == "constructor" and n.lhsKind != nnkStrLit:
-        glue.add bindSingleConstructor(ctx, n.genericParams, getImpl(n.node.symbol), subject, glueProc, procName, subjectName)
+        glue.add bindSingleConstructor(ctx, n, getImpl(n.node.symbol), subject, glueProc, procName, subjectName)
       else:
-        glue.add bindObjectSingleMethod(ctx, n.genericParams, getImpl(n.node.symbol), subject, glueProc, procName, subjectName)
+        glue.add bindObjectSingleMethod(ctx, n, getImpl(n.node.symbol), subject, glueProc, procName, subjectName)
     else: #nnkClosedSymChoice
       if n.name == "constructor" and n.lhsKind != nnkStrLit:
-        glue.add bindOverloadedConstructor(ctx, n.genericParams, n.node, subject, glueProc, procName, subjectName)
+        glue.add bindOverloadedConstructor(ctx, n, n.node, subject, glueProc, procName, subjectName)
       else:
-        glue.add bindObjectOverloadedMethod(ctx, n.genericParams, n.node, subject, glueProc, procName, subjectName)
+        glue.add bindObjectOverloadedMethod(ctx, n, n.node, subject, glueProc, procName, subjectName)
 
     inc proxyCount
 
