@@ -124,9 +124,9 @@ proc parseCode(s: string): NimNode {.compileTime.} =
   if nloDebug in gOptions: echo s
 
 #flatten formal param into seq
-proc paramsToArgListBasic(params: NimNode): seq[argDesc] {.compileTime.} =
+proc paramsToArgListBasic(params: NimNode, start = 1): seq[argDesc] {.compileTime.} =
   var argList = newSeq[argDesc]()
-  for i in 1..params.len-1:
+  for i in start..params.len-1:
     let arg = params[i]
     let mType = arg[arg.len - 2]
     let mVal = arg[arg.len - 1]
@@ -1038,6 +1038,32 @@ proc genPtrArg(nType: NimNode, i: int, procName: string): string {.compileTime.}
 proc genRangeArg(nType: NimNode, i: int, procName: string): string {.compileTime.} =
   result = "L.checkInteger($1.cint).int\n" % [$i]
 
+proc registerTupleCheck(ctx: proxyDesc, nType: NimNode, procName: string): string {.compileTime.} =
+  let name = "checkTuple$1" % [$proxyCount]
+  
+  if not hasName(name):
+    setName(name)
+    var glue = "proc $1(L: PState, idx: int): $2 =\n" % [name, nType.toStrLit.strVal]
+    glue.add "  L.checkType(idx.cint, LUA_TTABLE)\n"
+
+    let argList = paramsToArgListBasic(nType, 0)
+    for x in argList:
+      glue.add "  L.pushLiteral(\"$1\")\n" % [$x.mName]
+      glue.add "  L.getTable(idx.cint)\n"
+      let res = constructArg(ctx, x.mType, -1, procName)
+      if res == "":
+        error(procName & ": unknown tuple param type: " & $x.mType.kind & "\n" & x.mType.treeRepr)
+      glue.add "  result.$1 = $2"  % [$x.mName, res]
+    glue.add "  L.pop($1)\n" % [$argList.len]
+    gContext.add glue
+    
+  result = name
+
+proc genTupleArg(ctx: proxyDesc, nType: NimNode, i: int, procName: string): string {.compileTime.} =
+  let checkTup = registerTupleCheck(ctx, nType, procName)
+  var glue = "L.$1($2)\n" % [checkTup, $i]
+  result = glue
+
 proc constructComplexArg(ctx: proxyDesc, mType: NimNode, i: int, procName: string): string {.compileTime.} =
   if mType.kind == nnkSym:
     let nType = getImpl(mType.symbol)[2]
@@ -1050,6 +1076,9 @@ proc constructComplexArg(ctx: proxyDesc, mType: NimNode, i: int, procName: strin
     if nType.kind == nnkEnumTy:
       return constructArg(ctx, bindSym"int", i, procName)
 
+    if nType.kind == nnkTupleTy:
+      return genTupleArg(ctx, nType, i, procName)
+      
     if nType.kind == nnkBracketExpr:
       if $nType[0] == "array":
         return genArrayArg(ctx, nType, i, procName)
@@ -1081,7 +1110,10 @@ proc constructComplexArg(ctx: proxyDesc, mType: NimNode, i: int, procName: strin
 
   if mType.kind == nnkPtrTy:
     return genPtrArg(mType, i, procName)
-
+  
+  if mType.kind == nnkTupleTy:
+    return genTupleArg(ctx, mType, i, procName)
+      
   if mType.kind == nnkVarTy:
     let nType = getType(mType[0])
     if nType.kind in {nnkObjectTy, nnkRefTy}:
@@ -1183,6 +1215,23 @@ proc genSequenceRet(nType: NimNode, procCall, indent, procName: string): string 
   error(procName & ": unknown seq ret type: " & $nType.kind & "\n" & nType.treeRepr)
   result = ""
 
+proc genTupleRet(nType: NimNode, procCall, indent, procName: string): string {.compileTime.} =
+  var glue = ""
+  glue.add indent & "let tupTmp = $1\n" % [procCall]
+  glue.add indent & "L.createTable(0.cint, $1.cint)\n" % [$nType.len]
+  
+  let argList = paramsToArgListBasic(nType, 0)
+  
+  for x in argList:
+    glue.add indent & "L.pushLiteral(\"$1\")\n" % [$x.mName]
+    let res = constructRet(x.mType, "tupTmp." & $x.mName, indent, procName)
+    if res == "":
+      error(procName & ": unknown ret tuple field type: " & $nType.kind & "\n" & nType.treeRepr)
+    glue.add res
+    glue.add indent & "L.setTable(-3)\n"
+    
+  result = glue
+
 proc constructComplexRet(mType: NimNode, procCall, indent, procName: string): string {.compileTime.} =
   if mType.kind == nnkSym:
     let nType = getImpl(mType.symbol)[2]
@@ -1212,6 +1261,9 @@ proc constructComplexRet(mType: NimNode, procCall, indent, procName: string): st
     if nType.kind == nnkEnumTy:
       return indent & "L.pushInteger(lua_Integer(" & procCall & "))\n"
 
+    if nType.kind == nnkTupleTy:
+      return genTupleRet(nType, procCall, indent, procName)
+      
     if nType.kind == nnkPtrTy:
       return indent & "L.pushLightUserData(cast[pointer](" & procCall & "))\n"
 
@@ -1219,6 +1271,9 @@ proc constructComplexRet(mType: NimNode, procCall, indent, procName: string): st
       if $nType == "pointer":
         return indent & "L.pushLightUserData(" & procCall & ")\n"
 
+  if mType.kind == nnkTupleTy:
+      return genTupleRet(mType, procCall, indent, procName)
+      
   if mType.kind == nnkPtrTy:
     return indent & "L.pushLightUserData(cast[pointer](" & procCall & "))\n"
 
@@ -1520,7 +1575,7 @@ proc bindFunctionImpl*(ctx: proxyDesc): NimNode {.compileTime.} =
 
   if exportLib:
     glue.add SL & ".setGlobal(\"" & libName & "\")\n"
-
+  
   result = parseCode(gContext & glue)
 
 #call this macro with following params pattern:

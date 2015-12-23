@@ -253,6 +253,21 @@ proc opa(arg: openArray[int]): int =
   for i in arg:
     inc(result, i)
 
+type
+  myTup = tuple[a: string, b: int]
+  
+proc dino(a: myTup): string =
+  result = a.a
+  
+proc saurus(a: string): myTup =
+  result = (a, 10)
+  
+proc croco(a: tuple[a,b:int]): int =
+  result = a.b
+  
+proc dile(a: int): tuple[a,b: string] =
+  result = ($a, $a)
+
 #type
 #  Car = ref object
 #    speed: int
@@ -455,6 +470,14 @@ proc main() =
   L.test("closure.lua")
   L.test("openarray.lua")
 
+  L.bindFunction("tup"):
+    dino
+    saurus
+    croco
+    dile
+    
+  L.test("tuple.lua")
+  
   L.close()
 
 main()

@@ -58,7 +58,7 @@ no need to remember complicated API, the API is simple but powerful
 | ptr T | light user data |
 | range/subrange | integer |
 | openArray[T] | table -> seq[T] |
-| tuple | ? under construction |
+| tuple | assoc-table or array |
 | varargs[T] | not supported |
 ---
 ##**HOW TO USE**
