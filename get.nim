@@ -17,6 +17,11 @@ proc test(L: PState, fileName: string) =
   else:
     echo fileName & " .. OK"
     
+proc opa(arg: openArray[int]): int = 
+  result = 0
+  for i in arg:
+    inc(result, i)
+    
 proc main() =
   var test = 1237
   proc cl(): string =
@@ -34,17 +39,17 @@ proc main() =
     [cl] -> "clever"
     mew[int, int]
     mew[int, string] -> "mewt"
+    opa
   
   L.test("generic.lua")
   L.test("closure.lua")
+  L.test("openarray.lua")
   
   L.close()
   
 main()
 
 #TODO:
-#openArray[T]
-#openArray test
 #tuple
 #tuple test
 #getter/setter

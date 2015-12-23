@@ -1076,6 +1076,8 @@ proc constructComplexArg(ctx: proxyDesc, mType: NimNode, i: int, procName: strin
       return genSequenceArg(ctx, mType, i, procName)
     if $mType[0] == "range":
       return genRangeArg(mType, i, procName)
+    if ($mType[0]).toLower == "openarray":
+      return genSequenceArg(ctx, mType, i, procName)
 
   if mType.kind == nnkPtrTy:
     return genPtrArg(mType, i, procName)

@@ -57,7 +57,7 @@ no need to remember complicated API, the API is simple but powerful
 | pointer | light user data |
 | ptr T | light user data |
 | range/subrange | integer |
-| openArray[T] | ? under construction |
+| openArray[T] | table -> seq[T] |
 | tuple | ? under construction |
 | varargs[T] | not supported |
 ---
