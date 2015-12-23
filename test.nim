@@ -149,19 +149,19 @@ type
   PGene = ptr GENE
   Pint = pointer
   PPGene = ptr ptr GENE
-  
+
 proc chemA(a: chemArray): array[0..5, int] =
   for i in 0..result.high:
     result[i] = a[i]
-    
+
 proc geneA(a: geneArray): array[3, GENE] =
   for i in 0..result.high:
     result[i] = a[i]
-  
+
 proc fruitA(a: fruitArray): array[numFruits, FRUIT] =
   for i in 0..result.high:
     result[i] = a[i]
-  
+
 proc geneB(a: geneArray): geneArray =
   for i in 0..result.high:
     result[i] = a[i]
@@ -177,11 +177,11 @@ proc fruitC(a: array[numFruits, FRUIT]): fruitArray =
 proc chemC(a: array[0..11, int]): chemArray =
   for i in 0..result.high:
     result[i] = a[i]
-    
+
 proc fruitE(a: FRUIT): ATOM =
   if a == BANANA: result = PROTON
   else: result = NEUTRON
-  
+
 proc fruitS(a: fruitSet): set[FRUIT] =
   for k in a: result.incl k
 
@@ -193,7 +193,7 @@ proc fruitSA(a: set[FRUIT]): fruitSet =
 
 proc alphaSA(a: set[char]): cSet =
   for k in a: result.incl k
-  
+
 proc fruitQ(a: fruitSeq): seq[FRUIT] = result = a
 proc fruitQA(a: seq[FRUIT]): fruitSeq = result = a
 proc geneQ(a: geneSeq): seq[GENE] = result = a
@@ -204,7 +204,7 @@ proc stringQA(a: seq[string]): stringSeq = result = a
 proc seedP(): Pint = cast[Pint](123)
 proc geneP(a: PGene): Pint =
   result = cast[Pint](a)
-  
+
 proc intP(a: Pint): PGene =
   result = cast[PGene](a)
 
@@ -216,71 +216,84 @@ proc intPA(a: pointer): ptr GENE =
 
 proc genePPA(a: PPGene): pointer =
   result = cast[pointer](a)
-  
+
 proc intPPA(a: ptr ptr GENE): pointer =
   result = cast[pointer](a)
-  
+
 proc genePPB(a: pointer): PPGene =
   result = cast[PPGEne](a)
-  
+
 proc intPPB(a: pointer): ptr ptr GENE =
   result = cast[ptr ptr GENE](a)
-  
+
 type
   arango = range[0..10]
   brango = range[5..100]
-  
+
 proc trangA(a: arango): brango  =
   result = a + 5
-  
+
 proc trangB(a: range[1..7], b: range[0..8]): range[0..100] =
   result = a + b
-  
+
 proc trangC(a, b: int): range[5..50] =
   result = a + b + 5
 
-  
+type
+  Ship = object
+    speed*: int
+    power: int
+
+proc mew[T, K](a: T, b: K): T =
+  echo a, " ", b
+  result = a
+
+proc opa(arg: openArray[int]): int =
+  result = 0
+  for i in arg:
+    inc(result, i)
+
 #type
 #  Car = ref object
 #    speed: int
-#    
+#
 #  Bike = object
 #    wheel: int
-#    
+#
 #  OIL = enum
 #    GREASE, LUBRICANT, PETROLEUM, GASOLINE, KEROSENE
-#    
+#
 #  oilArray = array[0..11, OIL]
 #  oilSet = set[OIL]
 #  Poil = ptr OIL
 #  roil = range[5..10]
-    
+
 proc main() =
   var L = newNimLua()
 
   L.bindEnum(GENE)
   L.test("single_scoped_enum.lua")
-  
+
   L.bindEnum(GENE -> "DNA", ATOM -> GLOBAL, FRUIT)
   L.test("scoped_and_global_enum.lua")
-  
+
   L.bindEnum:
     ATOM
     GENE
     FRUIT
     `poncho`
   L.test("scoped_enum.lua")
-  
+
   L.bindFunction(mulv, tpc, tpm -> "goodMan")
   L.test("free_function.lua")
-  
+
   L.bindFunction("gum"):
     mulv
     tpc
     tpm -> "goodMan"
     `++`
   L.test("scoped_function.lua")
-  
+
   L.bindConst:
     MANGOES
     PAPAYA
@@ -288,7 +301,7 @@ proc main() =
     MAX_DASH_PATTERN
     CATHODE
     ANODE
-  
+
   L.bindConst("mmm"):
     ELECTRON16
     PROTON16
@@ -297,7 +310,7 @@ proc main() =
     ELECTRON64
     PROTON64
     connected
-  
+
   L.bindConst("ccc"):
     LABEL_STYLE_CH
     INFO_FIELD
@@ -306,18 +319,18 @@ proc main() =
     GREET
     mime
     programme
-  
+
   L.bindConst:
     MANGOES -> "MANGGA"
     PAPAYA -> "PEPAYA"
     LEMON -> "JERUK"
-  
+
   L.bindConst("buah"):
     MANGOES -> "MANGGA"
     PAPAYA -> "PEPAYA"
     LEMON -> "JERUK"
   L.test("constants.lua")
-  
+
   L.bindObject(Foo):
     newFoo -> constructor
     addv
@@ -327,52 +340,52 @@ proc main() =
     newFoo
     newFoo -> "whatever"
   L.test("fun.lua")
-  
+
   L.bindFunction("mac"):
     machine
   L.test("ov_func.lua")
-  
+
   L.bindObject(Acid):
     makeAcid -> constructor
     setLen
     getLen
-  
+
   L.bindFunction("acd"):
     makeAcid
-  
+
   L.bindFunction(makeAcid)
   L.bindObject(Fish):
     fishing -> constructor
-  
+
   L.bindObject(Fish):
     grill
     fry
-  
+
   L.bindFunction("gem", mining)
   L.bindFunction("gem", polish)
   L.bindConst("gem", ANODE)
-  
+
   L.bindObject(Fish -> "kakap"):
     grill
     fry
   L.test("regular_object.lua")
-  
+
   L.bindFunction(GLOBAL):
     mulv
-    
+
   L.bindFunction("GLOBAL", mulv, subb)
-    
+
   L.bindConst(GLOBAL):
     LEMON
-    
+
   L.bindConst("GLOBAL"):
     LEMON
-    
+
   L.bindEnum:
     GENE -> GLOBAL
     FRUIT -> "GLOBAL"
   L.test("namespace.lua")
-  
+
   L.bindFunction("arr"):
     chemA
     geneA
@@ -382,18 +395,18 @@ proc main() =
     fruitC
     chemC
   L.test("array_param_ret.lua")
-  
+
   L.bindFunction("proto_banana"):
     fruitE -> "radiate"
   L.test("enum_param_ret.lua")
-  
+
   L.bindFunction("set"):
     fruitS
     alphaS
     fruitSA
     alphaSA
   L.test("set_param_ret.lua")
-  
+
   L.bindFunction("seq"):
     fruitQ
     fruitQA
@@ -402,7 +415,7 @@ proc main() =
     stringQ
     stringQA
   L.test("sequence_param_ret.lua")
-  
+
   L.bindFunction("ptr"):
     seedP
     geneP
@@ -414,14 +427,40 @@ proc main() =
     genePPB
     intPPB
   L.test("ptr_pointer.lua")
-  
+
   L.bindFunction("range"):
     trangA
     trangB
     trangC -> "haha"
     trangC
   L.test("range_param_ret.lua")
-  
+
+  var test = 1237
+  proc cl(): string =
+    echo test
+    result = $test
+
+  L.bindObject(Ship):
+    speed(set)
+    speed(get, set) -> "cepat"
+
+  L.bindFunction("wow"):
+    [cl]
+    [cl] -> "clever"
+    mew[int, int]
+    mew[int, string] -> "mewt"
+    opa
+
+  L.test("generic.lua")
+  L.test("closure.lua")
+  L.test("openarray.lua")
+
   L.close()
 
 main()
+
+#TODO:
+#tuple
+#tuple test
+#getter/setter
+#getter/setter test

@@ -18,34 +18,34 @@ proc main() =
     encryptCFB8
     decryptCFB8
     cryptCTR
-  
+
   L.bindObject(SHA256):
     initSHA
     update
     final
-    
+
   L.bindObject(BMP):
     decodeBMP
     loadBMP
     convertTo32Bit
     convertTo24Bit
     convert
-  
+
   L.bindFunction("BMP"):
     loadBMP32
     loadBMP24
-    
+
   L.bindEnum:
     LabelStyle
     PageOrientationType
     CoordinateMode
     DestStyle
-  
+
   L.bindFunction():
     getSizeFromName
     makePageSize
     getVersion
-  
+
   L.bindObject(DocOpt):
     makeDocOpt
     addResourcesPath
@@ -55,7 +55,7 @@ proc main() =
     clearImagesPath
     clearResourcesPath
     clearAllPath
-  
+
   L.bindObject(Document):
     setInfo
     initPDF
@@ -140,12 +140,12 @@ proc main() =
     setEncryptionMode
     initAcroForm
     textField
-    
+    drawArc
+    arcTo
+    setDash
+
     #addPage
-    #drawArc
-    #arcTo
-    #setDash
-    
+
   L.bindObject(AcroForm):
     setFontColor
     setFontSize
@@ -153,5 +153,5 @@ proc main() =
     setFontStyle
     setEncoding
 
-  
+
 main()
