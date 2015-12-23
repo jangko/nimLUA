@@ -12,6 +12,7 @@ glue code generator to bind Nim and Lua together using Nim's powerful macro
 * bind enum
 * bind object
 * generic proc binding
+* closure binding
 * automatic resolve overloaded proc
 * easy namespace creation
 * easy debugging
@@ -26,7 +27,6 @@ glue code generator to bind Nim and Lua together using Nim's powerful macro
 
 * complex data types conversion, at least standard container
 * properties getter/setter
-* closure binding
 * access Lua code/data from Nim
 
 - - -
@@ -57,8 +57,8 @@ no need to remember complicated API, the API is simple but powerful
 | pointer | light user data |
 | ptr T | light user data |
 | range/subrange | integer |
-| tuple | ? under construction |
 | openArray[T] | ? under construction |
+| tuple | ? under construction |
 | varargs[T] | not supported |
 ---
 ##**HOW TO USE**
