@@ -13,6 +13,7 @@ glue code generator to bind Nim and Lua together using Nim's powerful macro
 * bind object
 * generic proc binding
 * closure binding
+* properties getter/setter
 * automatic resolve overloaded proc
 * easy namespace creation
 * easy debugging
@@ -26,7 +27,6 @@ glue code generator to bind Nim and Lua together using Nim's powerful macro
 **planned features**:
 
 * complex data types conversion, at least standard container
-* properties getter/setter
 * access Lua code/data from Nim
 
 - - -

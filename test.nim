@@ -56,9 +56,9 @@ proc tpc(s: string): string =
 proc tpm(s: string, v: string): string =
   result = s & " " & v
 
-proc rootv(u: float): seq[int] =
-  result = newSeq[int](10)
-  for i in 0..9: result[i] = int(u * i.float)
+proc rootv(u: float): seq[float] =
+  result = newSeq[float](10)
+  for i in 0..9: result[i] = u * i.float
 
 proc test(L: PState, fileName: string) =
   if L.doFile("test" & DirSep & fileName) != 0.cint:
@@ -239,11 +239,6 @@ proc trangB(a: range[1..7], b: range[0..8]): range[0..100] =
 proc trangC(a, b: int): range[5..50] =
   result = a + b + 5
 
-type
-  Ship = object
-    speed*: int
-    power: int
-
 proc mew[T, K](a: T, b: K): T =
   echo a, " ", b
   result = a
@@ -268,6 +263,26 @@ proc croco(a: tuple[a,b:int]): int =
 proc dile(a: int): tuple[a,b: string] =
   result = ($a, $a)
 
+type
+  Foos = ref object
+    name: string
+    
+  Ship = object
+    speed*: int
+    power, engine: int
+    
+proc newFoos(name: string): Foos =
+  new(result)
+  result.name = name
+  
+proc getName(a: Foos): string =
+  result = a.name
+  
+proc newShip(): Ship =
+  result.speed = 11
+  result.power = 12
+  result.engine = 3
+  
 #type
 #  Car = ref object
 #    speed: int
@@ -429,6 +444,7 @@ proc main() =
     geneQA
     stringQ
     stringQA
+    rootv
   L.test("sequence_param_ret.lua")
 
   L.bindFunction("ptr"):
@@ -455,10 +471,6 @@ proc main() =
     echo test
     result = $test
 
-  L.bindObject(Ship):
-    speed(set)
-    speed(get, set) -> "cepat"
-
   L.bindFunction("wow"):
     [cl]
     [cl] -> "clever"
@@ -470,6 +482,20 @@ proc main() =
   L.test("closure.lua")
   L.test("openarray.lua")
 
+  L.bindObject(Foos):
+    newFoos
+    getName
+    name(get,set)
+    
+  L.bindObject(Ship):
+    newShip
+    speed(set)
+    speed(get, set) -> "cepat"
+    engine(set)
+    power(get)
+    
+  L.test("getter_setter.lua")
+  
   L.bindFunction("tup"):
     dino
     saurus
@@ -477,13 +503,7 @@ proc main() =
     dile
     
   L.test("tuple.lua")
-  
+
   L.close()
 
 main()
-
-#TODO:
-#tuple
-#tuple test
-#getter/setter
-#getter/setter test

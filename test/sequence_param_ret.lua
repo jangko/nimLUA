@@ -27,3 +27,9 @@ for i=1, #b do
   assert(b[i] == a[i])
   assert(c[i] == a[i])
 end
+
+local b = seq.rootv(11.5)
+for i=1, 10 do
+  local c = (i-1) * 11.5
+  assert(c == b[i])
+end
