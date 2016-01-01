@@ -343,12 +343,12 @@ proc main() =
   ...
   
   var test = 1237
-    proc cl() =
-      echo test
+  proc cl() =
+    echo test
       
-    L.bindFunction:
-      [cl]
-      [cl] -> "clever"
+  L.bindFunction:
+    [cl]
+    [cl] -> "clever"
 ```
 
 ##**GETTER/SETTER**
@@ -358,10 +358,10 @@ type
     speed*: int
     power: int
     
-  L.bindObject(Ship):
-    speed(set)
-    speeg(get) -> "getter"
-    speed(get, set) -> "cepat"
+L.bindObject(Ship):
+  speed(set)
+  speeg(get) -> "getter"
+  speed(get, set) -> "cepat"
 ```
 
 ##**HOW TO DEBUG**
