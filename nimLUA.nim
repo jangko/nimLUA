@@ -105,7 +105,7 @@ proc convOpt(a: NimNode): nlOptions {.compileTime.} =
   of "nloAddMember": result = nloAddMember
   else: result = nloNone
 
-macro nimLuaOptions*(opt: nlOptions, mode: bool): stmt =
+macro nimLuaOptions*(opt: nlOptions, mode: bool): untyped =
   if $mode == "true":
     gOptions.incl convOpt(opt)
   else:
@@ -349,7 +349,7 @@ proc genProxyMacro(arg: NimNode, opts: bindFlags, proxyName: string): NimNode {.
 
   #generate intermediate macro to utilize bindSym that can only accept string literal
   let macroName = "NLB$1$2" % [proxyName, $macroCount]
-  var nlb = "macro " & macroName & "(): stmt =\n"
+  var nlb = "macro " & macroName & "(): untyped =\n"
   nlb.add "  var ctx: proxyDesc\n"
   nlb.add "  ctx.luaCtx = \"$1\"\n" % [luaCtx]
   if registerObject:
@@ -488,7 +488,7 @@ proc proxyMixer*(ctx: proxyDesc, proxyName: string): NimNode {.compileTime.} =
         collectSym(ids, im)
 
   let macroName = "NLB$1$2" % [proxyName, $macroCount]
-  var nlb = "macro " & macroName & "(): stmt =\n"
+  var nlb = "macro " & macroName & "(): untyped =\n"
   nlb.add "  var ctx: proxyDesc\n"
   nlb.add "  ctx.luaCtx = \"$1\"\n" % [ctx.luaCtx]
   if ctx.subject.kind == nnkSym:
@@ -805,7 +805,7 @@ proc bindEnumImpl*(ctx: proxyDesc): NimNode {.compileTime.} =
 
   result = parseCode(glue)
 
-macro bindEnum*(arg: varargs[untyped]): stmt =
+macro bindEnum*(arg: varargs[untyped]): untyped =
   result = genProxyMacro(arg, {}, "Enum")
 
 # -------------------------------------------------------------------------
@@ -1137,7 +1137,7 @@ proc constructComplexArg(ctx: proxyDesc, mType: NimNode, i: int, procName: strin
       return genSequenceArg(ctx, mType, i, procName)
     if $mType[0] == "range":
       return genRangeArg(mType, i, procName)
-    if ($mType[0]).toLower == "openarray":
+    if ($mType[0]).toLowerAscii == "openarray":
       return genSequenceArg(ctx, mType, i, procName)
 
   if mType.kind == nnkPtrTy:
@@ -1616,10 +1616,10 @@ proc bindFunctionImpl*(ctx: proxyDesc): NimNode {.compileTime.} =
 # * bindFunction(luaState, ident1, ident2, .., identN)
 #     -> export nim function(s) to lua global scope
 
-macro bindFunction*(arg: varargs[untyped]): stmt =
+macro bindFunction*(arg: varargs[untyped]): untyped =
   result = genProxyMacro(arg, {nlbUSeLib, nlbRegisterClosure, nlbRegisterGeneric}, "Function")
 
-macro bindProc*(arg: varargs[untyped]): stmt =
+macro bindProc*(arg: varargs[untyped]): untyped =
   result = genProxyMacro(arg, {nlbUSeLib, nlbRegisterClosure, nlbRegisterGeneric}, "Function")
 
 # ----------------------------------------------------------------------
@@ -1728,7 +1728,7 @@ proc bindConstImpl*(ctx: proxyDesc): NimNode {.compileTime.} =
 
   result = parseCode(glue)
 
-macro bindConst*(arg: varargs[untyped]): stmt =
+macro bindConst*(arg: varargs[untyped]): untyped =
   result = genProxyMacro(arg, {nlbUseLib}, "Const")
 
 # -----------------------------------------------------------------------
@@ -1990,5 +1990,5 @@ proc bindObjectImpl*(ctx: proxyDesc): NimNode {.compileTime.} =
   inc regsCount
   result = parseCode(gContext & glue)
 
-macro bindObject*(arg: varargs[untyped]): stmt =
+macro bindObject*(arg: varargs[untyped]): untyped =
   result = genProxyMacro(arg, {nlbRegisterObject, nlbRegisterClosure, nlbRegisterGeneric}, "Object")

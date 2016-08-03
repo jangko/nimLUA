@@ -26,8 +26,12 @@ when not defined(useLuaJIT):
     const
       LIB_NAME* = "liblua(5.3.so|.so.5.3)"
   else:
-    const
-      LIB_NAME* = "lua53.dll"
+    when defined(cpu64):
+      const    
+        LIB_NAME* = "lua53x64.dll"
+    else:
+      const    
+        LIB_NAME* = "lua53.dll"
 else:
   when defined(MACOSX):
     const
@@ -476,7 +480,7 @@ proc open_package*(L: PState): cint {.iluaLIB.}
 proc openlibs*(L: PState) {.iluaL.}
 
 when not defined(lua_assert):
-  template lua_assert*(x: expr): expr =
+  template lua_assert*(x: typed): typed =
     (cast[nil](0))
 
 
@@ -580,7 +584,7 @@ proc dostring*(L: PState, s: string): cint {.inline, discardable.} =
 proc getmetatable*(L: PState, s: string) {.inline.} =
   L.getfield(LUA_REGISTRYINDEX, s)
 
-template opt*(L: PState, f: TCFunction, n, d: expr): expr =
+template opt*(L: PState, f: TCFunction, n, d: typed): typed =
   if L.isnoneornil(n): d else: L.f(n)
 
 proc loadbuffer*(L: PState, buff: string, name: string): cint =
