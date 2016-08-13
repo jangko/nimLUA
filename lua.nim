@@ -27,10 +27,10 @@ when not defined(useLuaJIT):
       LIB_NAME* = "liblua(5.3.so|.so.5.3)"
   else:
     when defined(cpu64):
-      const    
+      const
         LIB_NAME* = "lua53x64.dll"
     else:
-      const    
+      const
         LIB_NAME* = "lua53.dll"
 else:
   when defined(MACOSX):
@@ -49,7 +49,7 @@ const
 
   # option for multiple returns in 'lua_pcall' and 'lua_call'
   LUA_MULTRET* = (-1)
-  
+
 #
 #* pseudo-indices
 #
@@ -64,12 +64,12 @@ when sizeof(int) >= 4: #LUAI_BITSINT >= 32:
 else:
   const
     LUAI_MAXSTACK* = 15000
-    
+
 # reserve some space for error handling
 const
   LUAI_FIRSTPSEUDOIDX* = (-LUAI_MAXSTACK - 1000)
   LUA_REGISTRYINDEX* = LUAI_FIRSTPSEUDOIDX
-  
+
 proc upvalueindex*(i: int): int {.inline.} = LUA_REGISTRYINDEX - i
 
 # thread status
@@ -90,7 +90,7 @@ type
   PState* = distinct pointer
   lua_State* = PState
   TCFunction* = proc (L: PState): cint{.cdecl.}
-  
+
   #* functions that read/write blocks when loading/dumping Lua chunks
   TReader* = proc (L: PState; ud: pointer; sz: ptr csize): cstring
   TWriter* = proc (L: PState; p: pointer; sz: csize; ud: pointer): cint
@@ -116,21 +116,21 @@ type
   LUA_TYPE* = enum
     LNONE = -1, LNIL, LBOOLEAN, LLIGHTUSERDATA, LNUMBER,
     LSTRING, LTABLE, LFUNCTION, LUSERDATA, LTHREAD, LNUMTAGS
-    
+
 # minimum Lua stack available to a C function
 const
   LUA_MINSTACK* = 20
-  
+
 # predefined values in the registry
 const
   LUA_RIDX_MAINTHREAD* = 1
   LUA_RIDX_GLOBALS* = 2
   LUA_RIDX_LAST* = LUA_RIDX_GLOBALS
-  
+
 type
   lua_Number* = float64  # type of numbers in Lua
   lua_Integer* = int64    # ptrdiff_t \ type for integer functions
-  
+
 {.push callconv: cdecl, dynlib: LIB_NAME .} # importc: "lua_$1"  was not allowed?
 {.pragma: ilua, importc: "lua_$1".} # lua.h
 {.pragma: iluaLIB, importc: "lua$1".} # lualib.h
@@ -236,7 +236,7 @@ proc setglobal*(L: PState; variable: cstring) {.ilua.}
 proc settable*(L: PState; idx: cint) {.ilua.}
 proc setfield*(L: PState; idx: cint; k: cstring) {.ilua.}
 proc rawset*(L: PState; idx: cint) {.ilua.}
-proc rawseti*(L: PState; idx: cint; n: cint) {.ilua.}
+proc rawseti*(L: PState; idx: cint; n: lua_Integer) {.ilua.}
 proc rawsetp*(L: PState; idx: cint; p: pointer) {.ilua.}
 proc setmetatable*(L: PState; objindex: cint): cint {.ilua.}
 proc setuservalue*(L: PState; idx: cint) {.ilua.}
@@ -338,13 +338,13 @@ proc tostring*(L: PState; index: cint): string =
   var s = L.tolstring(index, addr(len))
   result = newString(len)
   copyMem(result.cstring, s, len)
-  
+
 proc tobool*(L: PState; index: cint): bool =
   result = if L.toboolean(index) == 1: true else: false
-  
+
 proc gettype*(L: PState, index: int): LUA_TYPE =
   result = LUA_TYPE(L.luatype(index.cint))
-  
+
 #
 #* {======================================================================
 #* Debug API
@@ -376,7 +376,7 @@ const
 #
 const
   LUA_IDSIZE* = 60
-  
+
 # Functions to be called by the debugger in specific events
 type
   PDebug* = ptr lua.TDebug
@@ -529,7 +529,7 @@ proc error*(L: PState; fmt: cstring): cint {.varargs, iluaL.}
 proc checkoption*(L: PState; arg: cint; def: cstring; lst: ptr cstring): cint {.iluaL.}
 proc fileresult*(L: PState; stat: cint; fname: cstring): cint {.iluaL.}
 proc execresult*(L: PState; stat: cint): cint {.iluaL.}
-  
+
 # pre-defined references
 const
   LUA_NOREF* = (- 2)

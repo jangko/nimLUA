@@ -753,7 +753,7 @@ proc bindEnumScoped(SL: string, s: NimNode, scopeName: string, kind: NimNodeKind
     let
       n = x[2][i]
       sym = if n.kind == nnkAccQuoted: "`" & $n[0] & "`" else: $n
-    glue.add "discard $1.pushlString(\"$2\", $3)\n" % [SL, sym, $sym.len]
+    glue.add "discard $1.pushLString(\"$2\", $3)\n" % [SL, sym, $sym.len]
     glue.add "when compiles($1):\n" % [sym]
     glue.add "  $1.pushInteger(lua_Integer($2))\n" % [SL, sym]
     glue.add "else:\n"
@@ -1683,7 +1683,7 @@ proc constructConst(SL: string, n: NimNode, name: string): string {.compileTime.
       var nlb = "$1.createTable($2, 0)\n" % [SL, $n.len]
       nlb.add "for i in 0..$1:\n" % [$(n.len-1)]
       nlb.add constructConstBasic(SL, name, "  ", n[0])
-      nlb.add "  $1.rawSeti(-2, i.cint)\n" % [SL]
+      nlb.add "  $1.rawSeti(-2, i)\n" % [SL]
       return nlb
     elif n[0].kind in {nnkPar}:
       if n[0].len == 2:
@@ -1875,30 +1875,30 @@ proc bindObjectOverloadedMethod(ctx: proxyDesc, bd: bindDesc, ov: NimNode, glueP
 
 proc bindGetter(ctx: proxyDesc, glueProc, propName, subjectName: string, propType, subject: NimNode): string {.compileTime.} =
   var glue = ""
-  
+
   let
     procCall = "proxy.ud." & propName
-    procName = $subject & "." & propName    
-    
+    procName = $subject & "." & propName
+
   glue.add "proc " & glueProc & "(L: PState): cint {.cdecl.} =\n"
   glue.add "  var proxy = " & checkUD(subjectName, "1")
   glue.add constructRet(propType, procCall, "  ", procName)
   glue.add "  return 1\n"
   result = glue
-  
+
 proc bindSetter(ctx: proxyDesc, glueProc, propName, subjectName: string, propType, subject: NimNode): string {.compileTime.} =
   var glue = ""
-  
+
   let
     procCall = "proxy.ud." & propName
     procName = $subject & "." & propName
-  
+
   glue.add "proc " & glueProc & "(L: PState): cint {.cdecl.} =\n"
   glue.add "  var proxy = " & checkUD(subjectName, "1")
   glue.add "  $1 = $2" % [procCall, constructArg(ctx, propType, 2, procName)]
   glue.add "  return 0\n"
   result = glue
-  
+
 proc getPropType(subject: NimNode, prop: string): NimNode {.compileTime.} =
   let recList = if subject[2].kind == nnkRefTy: subject[2][0][2] else: subject[2][2]
   for n in recList:
@@ -1911,7 +1911,7 @@ proc getPropType(subject: NimNode, prop: string): NimNode {.compileTime.} =
       else:
         error("unknown prop construct")
   error("$2: not a prop of $1" % [$subject, prop])
-  
+
 proc bindObjectImpl*(ctx: proxyDesc): NimNode {.compileTime.} =
   let
     SL = ctx.luaCtx
@@ -1956,15 +1956,15 @@ proc bindObjectImpl*(ctx: proxyDesc): NimNode {.compileTime.} =
         getterProc = "nimLUAgetter" & $proxyCount
         setterProc = "nimLUAsetter" & $proxyCount
         propType = getPropType(getImpl(subject.symbol), propName)
-      
-      if n.getter: 
+
+      if n.getter:
         regs.add "  luaL_Reg(name: \"_get_$1\", fn: $2),\n" % [n.name, getterProc]
         glue.add bindGetter(ctx, getterProc, propName, subjectName, propType, subject)
-        
-      if n.setter: 
+
+      if n.setter:
         regs.add "  luaL_Reg(name: \"_set_$1\", fn: $2),\n" % [n.name, setterProc]
         glue.add bindSetter(ctx, setterProc, propName, subjectName, propType, subject)
-      
+
       inc proxyCount
 
   if isRefType(subject) and not hasName("dtor" & $subject):
@@ -1979,7 +1979,7 @@ proc bindObjectImpl*(ctx: proxyDesc): NimNode {.compileTime.} =
 
   glue.add regs
   glue.add "$1.setFuncs(cast[ptr luaL_reg](addr(regs$2$3)), 0)\n" % [SL, subjectName, $regsCount]
-  
+
   if ctx.propList.len > 0:
     glue.add "$1.propsEnd()\n" % [SL]
   else:

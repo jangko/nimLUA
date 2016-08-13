@@ -11,7 +11,9 @@ assert(mmm.ELECTRON32 == 14)
 assert(mmm.PROTON32 == 15)
 assert(mmm.ELECTRON64 == 16)
 assert(mmm.PROTON64 == 17)
-  
+
+print(ccc.LABEL_STYLE_CH[0])
+
 assert(ccc.LABEL_STYLE_CH[0] == "D") --["D", "R", "r", "A", "a"]
 assert(ccc.INFO_FIELD[0] == "Creator")--["Creator", "Producer", "Title", "Subject", "Author", "Keywords"]
 assert(ccc.STAIR[0] == 123) --[123, 456]
@@ -23,8 +25,7 @@ assert(ccc.mime.men == "woman")
 assert(ccc.programme[1] == "state")
 assert(ccc.programme[2] == "power")
 assert(ccc.programme[3] == "result")
-  
-  
+
 assert(MANGGA == 10.0)
 assert(PEPAYA == 11.0)
 assert(JERUK == 12.0)

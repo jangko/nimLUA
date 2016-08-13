@@ -250,39 +250,39 @@ proc opa(arg: openArray[int]): int =
 
 type
   myTup = tuple[a: string, b: int]
-  
+
 proc dino(a: myTup): string =
   result = a.a
-  
+
 proc saurus(a: string): myTup =
   result = (a, 10)
-  
+
 proc croco(a: tuple[a,b:int]): int =
   result = a.b
-  
+
 proc dile(a: int): tuple[a,b: string] =
   result = ($a, $a)
 
 type
   Foos = ref object
     name: string
-    
+
   Ship = object
     speed*: int
     power, engine: int
-    
+
 proc newFoos(name: string): Foos =
   new(result)
   result.name = name
-  
+
 proc getName(a: Foos): string =
   result = a.name
-  
+
 proc newShip(): Ship =
   result.speed = 11
   result.power = 12
   result.engine = 3
-  
+
 #type
 #  Car = ref object
 #    speed: int
@@ -300,29 +300,6 @@ proc newShip(): Ship =
 
 proc main() =
   var L = newNimLua()
-
-  L.bindEnum(GENE)
-  L.test("single_scoped_enum.lua")
-
-  L.bindEnum(GENE -> "DNA", ATOM -> GLOBAL, FRUIT)
-  L.test("scoped_and_global_enum.lua")
-
-  L.bindEnum:
-    ATOM
-    GENE
-    FRUIT
-    `poncho`
-  L.test("scoped_enum.lua")
-
-  L.bindFunction(mulv, tpc, tpm -> "goodMan")
-  L.test("free_function.lua")
-
-  L.bindFunction("gum"):
-    mulv
-    tpc
-    tpm -> "goodMan"
-    `++`
-  L.test("scoped_function.lua")
 
   L.bindConst:
     MANGOES
@@ -360,6 +337,29 @@ proc main() =
     PAPAYA -> "PEPAYA"
     LEMON -> "JERUK"
   L.test("constants.lua")
+
+  L.bindEnum(GENE)
+  L.test("single_scoped_enum.lua")
+
+  L.bindEnum(GENE -> "DNA", ATOM -> GLOBAL, FRUIT)
+  L.test("scoped_and_global_enum.lua")
+
+  L.bindEnum:
+    ATOM
+    GENE
+    FRUIT
+    `poncho`
+  L.test("scoped_enum.lua")
+
+  L.bindFunction(mulv, tpc, tpm -> "goodMan")
+  L.test("free_function.lua")
+
+  L.bindFunction("gum"):
+    mulv
+    tpc
+    tpm -> "goodMan"
+    `++`
+  L.test("scoped_function.lua")
 
   L.bindObject(Foo):
     newFoo -> constructor
@@ -486,22 +486,22 @@ proc main() =
     newFoos
     getName
     name(get,set)
-    
+
   L.bindObject(Ship):
     newShip
     speed(set)
     speed(get, set) -> "cepat"
     engine(set)
     power(get)
-    
+
   L.test("getter_setter.lua")
-  
+
   L.bindFunction("tup"):
     dino
     saurus
     croco
     dile
-    
+
   L.test("tuple.lua")
 
   L.close()
