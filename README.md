@@ -41,7 +41,7 @@ no need to remember complicated API, the API is simple but powerful
 
 - - -
 
-##**DATA TYPE CONVERSION**
+## **DATA TYPE CONVERSION**
 
 | Nim | Lua |
 |--------------------------------|----------------------------------|
@@ -61,9 +61,9 @@ no need to remember complicated API, the API is simple but powerful
 | tuple | assoc-table or array |
 | varargs[T] | not supported |
 ---
-##**HOW TO USE**
+## **HOW TO USE**
 
-###**1. bindEnum**
+### **1. bindEnum**
 
 ```nimrod
 import nimLua, os
@@ -82,7 +82,7 @@ proc test(L: PState, fileName: string) =
     L.pop(1)
   else:
     echo fileName & " .. OK"
-       
+
 proc main() =
   var L = newNimLua()
   L.bindEnum(FRUIT, SUBATOM, GENE)
@@ -146,7 +146,7 @@ assert(PROTON == 1)
 assert(NEUTRON == 2)
 ```
 
-###**2. bindConst**
+### **2. bindConst**
 
 ```nimrod
 import nimLua
@@ -183,7 +183,7 @@ if you use **GLOBAL** without quote as namespace, it will have no effect
 
 operator `->` have same meaning with bindEnum, to rename exported symbol on Lua side
 
-###**3. bindFunction/bindProc**
+### **3. bindFunction/bindProc**
 
 bindFunction is an alias to bindProc, they behave identically
 
@@ -206,7 +206,7 @@ overloaded procs will be automatically resolved by their params count and types
 
 operator `->` have same meaning with bindEnum, to rename exported symbol on Lua side
 
-###**4. bindObject**
+### **4. bindObject**
 
 ```nimrod
 import nimLua
@@ -218,13 +218,13 @@ type
 proc newFoo(name: string): Foo =
   new(result)
   result.name = name
-  
+
 proc addv(f: Foo, a, b: int): int =
   result = 2 * (a + b)
 
 proc addv(f: Foo, a, b: string): string =
   result = "hello: my name is $1, here is my message: $2, $3" % [f.name, a, b]
-  
+
 proc addk(f: Foo, a, b: int): string =
   result = f.name & ": " & $a & " + " & $b & " = " & $(a+b)
 
@@ -255,7 +255,7 @@ operator `->` on non constructor will behave the same as other binder.
 
 overloaded proc will be automatically resolved by their params count and types, including overloaded constructor
 
-destructor will be generated automatically for ref object, none for regular object. 
+destructor will be generated automatically for ref object, none for regular object.
 GC safety works as usual on both side of Nim and Lua, no need to worry, except when you manually allocated memory
 
 ```Lua
@@ -291,19 +291,19 @@ if you want to turn off this functionality, call **nimLuaOptions**(nloAddMember,
 ```nimrod
 L.bindObject(Foo): #namespace creation
   newFoo -> constructor
-  
+
 L.bindObject(Foo): #add new member
   addv
   addk -> "add"
-  
+
 L.bindFunction("gem"): #namespace "gem" creation
   mining
-  
+
 L.bindFunction("gem"): #add 'polish' member
   polish
 ```
 
-##**PASSING BY REFERENCE**
+## **PASSING BY REFERENCE**
 
 Lua basic data types cannot be passed by reference, but Nim does
 
@@ -327,44 +327,44 @@ assert(b == 25)
 
 basically, outval will become retval, FIFO ordered
 
-##**GENERIC PROC BINDING**
+## **GENERIC PROC BINDING**
 ```nimrod
 proc mew[T, K](a: T, b: K): T =
   discard
-  
+
 L.bindFunction:
   mew[int, string]
   mew[int, string] -> "mewt"
 ```
 
-##**CLOSURE BINDING**
+## **CLOSURE BINDING**
 ```nimrod
 proc main() =
   ...
-  
+
   var test = 1237
   proc cl() =
     echo test
-      
+
   L.bindFunction:
     [cl]
     [cl] -> "clever"
 ```
 
-##**GETTER/SETTER**
+## **GETTER/SETTER**
 ```nimrod
 type
   Ship = object
     speed*: int
     power: int
-    
+
 L.bindObject(Ship):
   speed(set)
   speeg(get) -> "getter"
   speed(get, set) -> "cepat"
 ```
 
-##**HOW TO DEBUG**
+## **HOW TO DEBUG**
 
 you can call **nimLuaOptions**(nloDebug, true/false)
 
@@ -373,15 +373,13 @@ nimLuaOptions(nloDebug, true) #turn on debug
 L.bindEnum:
   GENE
   SUBATOM
-  
+
 nimLuaOptions(nloDebug, false) #turn off debug mode
 L.bindFunction:
   machine
   engine
 ```
 
-##**HOW TO ACCESS LUA CODE FROM NIM?**
+## **HOW TO ACCESS LUA CODE FROM NIM?**
 
 still under development, contributions are welcome
-
-
