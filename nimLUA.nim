@@ -1971,6 +1971,7 @@ proc bindObjectImpl*(ctx: proxyDesc): NimNode {.compileTime.} =
     glue.add "proc $1_destructor(L: PState): cint {.cdecl.} =\n" % [subjectName]
     glue.add "  var proxy = " & checkUD(subjectName, "1")
     glue.add "  GC_unref(proxy.ud)\n"
+    glue.add "  proxy.ud = nil\n"
     regs.add "  luaL_Reg(name: \"__gc\", fn: $1_destructor),\n" % [subjectName]
     setName("dtor" & $subject)
 
