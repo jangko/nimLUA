@@ -366,8 +366,18 @@ type
 
 L.bindObject(Ship):
   speed(set)
-  speeg(get) -> "getter"
-  speed(get, set) -> "cepat"
+  speed(get) -> "currentSpeed"
+  speed(get, set) -> "velocity"
+```
+
+then you can access the object's properties on lua side using '.' (dot) and not ':' (colon)
+```lua
+local b = Ship.newShip()
+b.speed = 19
+assert(b.speed == nil) -- setter only
+assert(b.currentSpeed == 19) -- getter only
+b.velocity = 20
+assert(b.velocity == 20) -- getter & setter
 ```
 
 ## **HOW TO DEBUG**
