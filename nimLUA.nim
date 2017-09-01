@@ -1993,3 +1993,10 @@ proc bindObjectImpl*(ctx: proxyDesc): NimNode {.compileTime.} =
 
 macro bindObject*(arg: varargs[untyped]): untyped =
   result = genProxyMacro(arg, {nlbRegisterObject, nlbRegisterClosure, nlbRegisterGeneric}, "Object")
+
+# use this macro to generate alias for object meta table name dan proxy name
+macro getRegisteredType*(obj: typed, metaTableName, proxyName: untyped): untyped =
+  let subjectName = registerObject(obj)
+  var glue = "type $1 = luaL_$2Proxy\n" % [$proxyName, subjectName]
+  glue.add "const $1 = luaL_$2\n" % [$metaTableName, subjectName]
+  result = parseCode(glue)

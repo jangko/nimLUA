@@ -303,6 +303,12 @@ L.bindFunction("gem"): #add 'polish' member
   polish
 ```
 
+#### **4.1. bindObject without member**
+
+It's ok to call bindObject without any additional member/method if you want to
+register object type and use it later. For example if you want to create your own
+object constructor
+
 ## **PASSING BY REFERENCE**
 
 Lua basic data types cannot be passed by reference, but Nim does
