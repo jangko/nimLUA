@@ -704,7 +704,7 @@ function __nlbIndex(myobject, key)
   if x ~= nil then
     return x(myobject)
   else
-    return mytable[key]
+    return nil
   end
 end
 function __nlbNewIndex(myobject, key, value)
