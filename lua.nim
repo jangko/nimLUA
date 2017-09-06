@@ -92,7 +92,7 @@ type
   TCFunction* = proc (L: PState): cint{.cdecl.}
 
   #* functions that read/write blocks when loading/dumping Lua chunks
-  TReader* = proc (L: PState; ud: pointer; sz: ptr csize): cstring {.cdecl.}
+  TReader* = proc (L: PState; ud: pointer; sz: var csize): cstring {.cdecl.}
   TWriter* = proc (L: PState; p: pointer; sz: csize; ud: pointer): cint {.cdecl.}
 
   #* prototype for memory-allocation functions
@@ -170,10 +170,10 @@ proc isuserdata*(L: PState; idx: cint): cint {.ilua.}
 proc isinteger*(L: PState; idx: cint): cint {.ilua.}
 proc luatype*(L: PState; idx: cint): cint {.importc: "lua_type".}
 proc typename*(L: PState; tp: cint): cstring {.ilua.}
-proc tonumberx*(L: PState; idx: cint; isnum: ptr cint): lua_Number {.ilua.}
-proc tointegerx*(L: PState; idx: cint; isnum: ptr cint): lua_Integer {.ilua.}
+proc tonumberx*(L: PState; idx: cint; isnum: var cint): lua_Number {.ilua.}
+proc tointegerx*(L: PState; idx: cint; isnum: var cint): lua_Integer {.ilua.}
 proc toboolean*(L: PState; idx: cint): cint {.ilua.}
-proc tolstring*(L: PState; idx: cint; len: ptr csize): cstring {.ilua.}
+proc tolstring*(L: PState; idx: cint; len: var csize): cstring {.ilua.}
 proc rawlen*(L: PState; idx: cint): csize {.ilua.}
 proc tocfunction*(L: PState; idx: cint): TCFunction {.ilua.}
 proc touserdata*(L: PState; idx: cint): pointer {.ilua.}
@@ -511,8 +511,8 @@ proc callmeta*(L: PState; obj: cint; e: cstring): cint {.iluaL.}
 #proc tolstring*(L: PState; idx: cint; len: ptr csize): cstring {.importc: "luaL_tolstring".}
 # ^ duplicate?
 proc argerror*(L: PState; numarg: cint; extramsg: cstring): cint {.iluaL.}
-proc checklstring*(L: PState; arg: cint; len: ptr csize): cstring {.iluaL.}
-proc optlstring*(L: PState; arg: cint; def: cstring; len: ptr csize): cstring {.iluaL.}
+proc checklstring*(L: PState; arg: cint; len: var csize): cstring {.iluaL.}
+proc optlstring*(L: PState; arg: cint; def: cstring; len: var csize): cstring {.iluaL.}
 proc checknumber*(L: PState; arg: cint): lua_Number {.iluaL.}
 proc optnumber*(L: PState; arg: cint; def: lua_Number): lua_Number {.iluaL.}
 proc checkinteger*(L: PState; arg: cint): lua_Integer {.iluaL.}
@@ -526,7 +526,7 @@ proc testudata*(L: PState; ud: cint; tname: cstring): pointer {.iluaL.}
 proc checkudata*(L: PState; ud: cint; tname: cstring): pointer {.iluaL.}
 proc where*(L: PState; lvl: cint) {.iluaL.}
 proc error*(L: PState; fmt: cstring): cint {.varargs, iluaL.}
-proc checkoption*(L: PState; arg: cint; def: cstring; lst: ptr cstring): cint {.iluaL.}
+proc checkoption*(L: PState; arg: cint; def: cstring; lst: var cstring): cint {.iluaL.}
 proc fileresult*(L: PState; stat: cint; fname: cstring): cint {.iluaL.}
 proc execresult*(L: PState; stat: cint): cint {.iluaL.}
 
