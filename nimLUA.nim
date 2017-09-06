@@ -1920,7 +1920,7 @@ proc bindSetter(ctx: proxyDesc, glueProc, propName, subjectName: string, propTyp
     procName = $subject & "." & propName
 
   glue.add "proc " & glueProc & "(L: PState): cint {.cdecl.} =\n"
-  glue.add "  if L.gettop() != 1: return 0\n"
+  glue.add "  if L.gettop() != 2: return 0\n"
   glue.add "  if L.luaType(1) != LUA_TUSERDATA: return 0\n"
   glue.add "  var proxy = " & checkUD(subjectName, "1")
   glue.add "  $1 = $2" % [procCall, constructArg(ctx, propType, 2, procName)]

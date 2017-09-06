@@ -170,10 +170,10 @@ proc isuserdata*(L: PState; idx: cint): cint {.ilua.}
 proc isinteger*(L: PState; idx: cint): cint {.ilua.}
 proc luatype*(L: PState; idx: cint): cint {.importc: "lua_type".}
 proc typename*(L: PState; tp: cint): cstring {.ilua.}
-proc tonumberx*(L: PState; idx: cint; isnum: var cint): lua_Number {.ilua.}
-proc tointegerx*(L: PState; idx: cint; isnum: var cint): lua_Integer {.ilua.}
+proc tonumberx*(L: PState; idx: cint; isnum: ptr cint): lua_Number {.ilua.}
+proc tointegerx*(L: PState; idx: cint; isnum: ptr cint): lua_Integer {.ilua.}
 proc toboolean*(L: PState; idx: cint): cint {.ilua.}
-proc tolstring*(L: PState; idx: cint; len: var csize): cstring {.ilua.}
+proc tolstring*(L: PState; idx: cint; len: ptr csize): cstring {.ilua.}
 proc rawlen*(L: PState; idx: cint): csize {.ilua.}
 proc tocfunction*(L: PState; idx: cint): TCFunction {.ilua.}
 proc touserdata*(L: PState; idx: cint): pointer {.ilua.}
@@ -511,8 +511,8 @@ proc callmeta*(L: PState; obj: cint; e: cstring): cint {.iluaL.}
 #proc tolstring*(L: PState; idx: cint; len: ptr csize): cstring {.importc: "luaL_tolstring".}
 # ^ duplicate?
 proc argerror*(L: PState; numarg: cint; extramsg: cstring): cint {.iluaL.}
-proc checklstring*(L: PState; arg: cint; len: var csize): cstring {.iluaL.}
-proc optlstring*(L: PState; arg: cint; def: cstring; len: var csize): cstring {.iluaL.}
+proc checklstring*(L: PState; arg: cint; len: ptr csize): cstring {.iluaL.}
+proc optlstring*(L: PState; arg: cint; def: cstring; len: ptr csize): cstring {.iluaL.}
 proc checknumber*(L: PState; arg: cint): lua_Number {.iluaL.}
 proc optnumber*(L: PState; arg: cint; def: lua_Number): lua_Number {.iluaL.}
 proc checkinteger*(L: PState; arg: cint): lua_Integer {.iluaL.}

@@ -298,6 +298,29 @@ proc newShip(): Ship =
 #  Poil = ptr OIL
 #  roil = range[5..10]
 
+type
+  BaseFruit = object of RootObj
+    id: int
+  Pineapple = object of BaseFruit
+    name: string
+  Avocado = ref object of BaseFruit
+    name: string
+
+proc newAvocado(name: string, id: int): Avocado =
+  new(result)
+  result.name = name
+  result.id = id
+
+proc initPineapple(name: string, id: int): Pineapple =
+  result.name = name
+  result.id = id
+
+#proc getId(self: BaseFruit): int =
+  #self.id
+  
+#proc getId(self: ref BaseFruit): int =
+  #self.id
+
 proc main() =
   var L = newNimLua()
 
@@ -503,6 +526,22 @@ proc main() =
     dile
 
   L.test("tuple.lua")
+
+  nimLuaOptions(nloDebug, true)
+  L.bindObject(Avocado):
+    newAvocado -> "new"
+    name(get)
+    id(get)
+    #getId
+  nimLuaOptions(nloDebug, false)
+  
+  L.bindObject(Pineapple):
+    initPineapple -> "init"
+    name(get)
+    id(get)
+    #getId
+
+  L.test("inheritance.lua")
 
   L.close()
 
