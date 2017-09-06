@@ -92,8 +92,8 @@ type
   TCFunction* = proc (L: PState): cint{.cdecl.}
 
   #* functions that read/write blocks when loading/dumping Lua chunks
-  TReader* = proc (L: PState; ud: pointer; sz: ptr csize): cstring
-  TWriter* = proc (L: PState; p: pointer; sz: csize; ud: pointer): cint
+  TReader* = proc (L: PState; ud: pointer; sz: ptr csize): cstring {.cdecl.}
+  TWriter* = proc (L: PState; p: pointer; sz: csize; ud: pointer): cint {.cdecl.}
 
   #* prototype for memory-allocation functions
   TAlloc* = proc (ud, p: pointer; osize, nsize: csize): pointer
