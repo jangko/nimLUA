@@ -315,11 +315,11 @@ proc initPineapple(name: string, id: int): Pineapple =
   result.name = name
   result.id = id
 
-#proc getId(self: BaseFruit): int =
-  #self.id
-  
-#proc getId(self: ref BaseFruit): int =
-  #self.id
+proc getId(self: BaseFruit): int =
+  self.id
+
+proc getId(self: ref BaseFruit): int =
+  self.id
 
 proc main() =
   var L = newNimLua()
@@ -527,19 +527,17 @@ proc main() =
 
   L.test("tuple.lua")
 
-  nimLuaOptions(nloDebug, true)
   L.bindObject(Avocado):
     newAvocado -> "new"
     name(get)
     id(get)
-    #getId
-  nimLuaOptions(nloDebug, false)
-  
+    getId
+
   L.bindObject(Pineapple):
     initPineapple -> "init"
     name(get)
     id(get)
-    #getId
+    getId
 
   L.test("inheritance.lua")
 

@@ -603,6 +603,15 @@ proc isRefType(s: NimNode): bool {.compileTime.} =
   if n[2].kind != nnkRefTy: return false
   result = true
 
+proc isObjectType(s: NimNode): bool {.compileTime.} =
+  let n = getImpl(s.symbol)
+  if n.kind != nnkTypeDef: return false
+  if n[2].kind != nnkObjectTy: return false
+  result = true
+
+proc isRefOrObjectType(s: NimNode): bool {.compileTime.} =
+  result = isRefType(s) or isObjectType(s)
+
 proc hasName(name: string): bool {.compileTime.} =
   for n in nameList:
     if n == name: return true
@@ -1776,7 +1785,7 @@ proc bindSingleConstructor(ctx: proxyDesc, bd: bindDesc, n: NimNode, glueProc, p
   glue.add "  var proxy = " & newUD(subjectName)
   #always zeroed the memory if you mix gc code and unmanaged code
   #otherwise, strange things will happened
-  if isRefType(subject): glue.add "  zeroMem(proxy, sizeof(luaL_$1Proxy))\n" % [subjectName]
+  if isRefOrObjectType(subject): glue.add "  zeroMem(proxy, sizeof(luaL_$1Proxy))\n" % [subjectName]
   glue.add genOvCallSingle(ctx, newProcElem(retType, argList), procName, "", {ovfConstructor}, bd)
   if isRefType(subject): glue.add "  GC_ref(proxy.ud)\n"
   glue.add "  L.getMetatable(luaL_$1)\n" % [subjectName]
@@ -1788,6 +1797,29 @@ proc eqType(a, b: NimNode): bool {.compileTime.} =
   if a.kind == nnkSym and b.kind == nnkVarTy:
     if sameType(a, b[0]): return true
   result = sameType(a, b)
+
+proc getParentName(n: NimNode, res: var seq[string]) =
+  var prefix = ""
+  var a = getImpl(n.symbol)[2]
+  if a.kind notin {nnkObjectTy, nnkRefTy}: return
+  if a.kind == nnkRefTy:
+    a = a[0]
+    prefix = "ref "
+    if a.kind != nnkObjectTy: return
+  a = a[1]
+  if a.kind != nnkOfInherit: return
+  res.add(prefix & $a[0])
+  getParentName(a[0], res)
+
+proc isDescendant(a, b: NimNode): bool {.compileTime.} =
+  if b.kind notin {nnkRefTy, nnkSym}: return false
+  let bType = if b.kind == nnkRefTy: "ref " & $b[0] else: $b
+  var parents = newSeq[string]()
+  getParentName(a, parents)
+  result = parents.contains(bType)
+
+proc eqTypeOrDescendant(a, b: NimNode): bool {.compileTime.} =
+  result = eqType(a, b) or isDescendant(a, b)
 
 proc bindOverloadedConstructor(ctx: proxyDesc, bd: bindDesc, ov: NimNode, glueProc, procName, subjectName: string): string {.compileTime.} =
   var ovl = newSeq[ovProc]()
@@ -1810,7 +1842,7 @@ proc bindOverloadedConstructor(ctx: proxyDesc, bd: bindDesc, ov: NimNode, gluePr
     let argList = paramsToArgList(params, bd.genericParams, n[2])
 
     #not a valid constructor
-    if subject.kind != retType.kind and not eqType(subject, retType): continue
+    if subject.kind != retType.kind and not eqTypeOrDescendant(subject, retType): continue
     ovl.addOvProc(retType, argList)
     inc i
 
@@ -1818,7 +1850,7 @@ proc bindOverloadedConstructor(ctx: proxyDesc, bd: bindDesc, ov: NimNode, gluePr
   glue.add "  var proxy = cast[ptr luaL_$1Proxy](L.newUserData(sizeof(luaL_$1Proxy)))\n" % [subjectName]
   #always zeroed the memory if you mix gc code and unmanaged code
   #otherwise, strange things will happened
-  if isRefType(subject): glue.add "  zeroMem(proxy, sizeof(luaL_$1Proxy))\n" % [subjectName]
+  if isRefOrObjectType(subject): glue.add "  zeroMem(proxy, sizeof(luaL_$1Proxy))\n" % [subjectName]
   glue.add genOvCall(ctx, ovl, procName, {ovfConstructor}, bd)
   if isRefType(subject): glue.add "  GC_ref(proxy.ud)\n"
   glue.add "  L.getMetatable(luaL_$1)\n" % [subjectName]
@@ -1837,13 +1869,13 @@ proc bindObjectSingleMethod(ctx: proxyDesc, bd: bindDesc, n: NimNode, glueProc, 
     SL = ctx.luaCtx
     subject = ctx.subject
 
-  if eqType(subject, retType):
+  if eqTypeOrDescendant(subject, retType):
     return bindSingleConstructor(ctx, bd, n, glueProc, procName, subjectName)
 
   if argList.len == 0:
     error(procName & ": invalid object method")
 
-  if not eqType(subject, argList[0].mType):
+  if not eqTypeOrDescendant(subject, argList[0].mType):
     error("object method need object type as first param: " & procName)
 
   var glue = ""
@@ -1875,12 +1907,12 @@ proc bindObjectOverloadedMethod(ctx: proxyDesc, bd: bindDesc, ov: NimNode, glueP
     let retType = replaceRet(params[0], bd.genericParams, n[2])
     let argList = paramsToArgList(params, bd.genericParams, n[2])
 
-    if eqType(subject, retType): #constructor like
+    if eqTypeOrDescendant(subject, retType): #constructor like
       ovc.add s
       continue
 
     if argList.len == 0: continue #not a valid object method
-    if not eqType(subject, argList[0].mType): continue
+    if not eqTypeOrDescendant(subject, argList[0].mType): continue
     ovl.addOvProc(retType, argList)
     inc i
 
