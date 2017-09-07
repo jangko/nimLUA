@@ -832,28 +832,28 @@ macro bindEnum*(arg: varargs[untyped]): untyped =
 # -------------------------------------------------------------------------
 
 #runtime type check helper for string
-proc checkNimString*(L: PState, idx: cint): string =
+proc nimCheckString*(L: PState, idx: cint): string =
   if L.isString(idx) != 0: result = L.toString(idx)
   else: result = ""
 
 #runtime type check helper for bool
-proc checkNimBool*(L: PState, idx: cint): bool =
+proc nimCheckBool*(L: PState, idx: cint): bool =
   if L.isBoolean(idx): result = if L.toBoolean(idx) == 0: false else: true
   else: result = false
 
-proc checkNimInteger*(L: PState, idx: cint): int =
+proc nimCheckInteger*(L: PState, idx: cint): int =
   if L.isInteger(idx) != 0: result = L.toInteger(idx).int
   else: result = 0
 
-proc checkNimNumber*(L: PState, idx: cint): float64 =
+proc nimCheckNumber*(L: PState, idx: cint): float64 =
   if L.isNumber(idx) != 0: result = L.toNumber(idx).float64
   else: result = 0.0
 
-proc checkCString*(L: PState, idx: cint): cstring =
+proc nimCheckCstring*(L: PState, idx: cint): cstring =
   if L.isString(idx) != 0: result = L.toLString(idx, nil)
   else: result = nil
 
-proc checkNimChar*(L: PState, idx: cint): char =
+proc nimCheckChar*(L: PState, idx: cint): char =
   if L.isInteger(idx) != 0: result = L.toInteger(idx).char
   else: result = chr(0)
 
@@ -895,23 +895,23 @@ proc constructBasicArg(mType: NimNode, i: int, procName: string): string {.compi
   let argType = $mType
   for c in intTypes:
     if c == argType:
-      return "L.checkNimInteger(" & $i & ")." & c & "\n"
+      return "L.nimCheckInteger(" & $i & ")." & c & "\n"
 
   for c in floatTypes:
     if c == argType:
-      return "L.checkNimNumber(" & $i & ")." & c & "\n"
+      return "L.nimCheckNumber(" & $i & ")." & c & "\n"
 
   if argType == "string":
-    return "L.checkNimString(" & $i & ")\n"
+    return "L.nimCheckString(" & $i & ")\n"
 
   if argType == "cstring":
-    return "L.checkCString(" & $i & ")\n"
+    return "L.nimCheckCstring(" & $i & ")\n"
 
   if argType == "bool":
-    return "L.checkNimBool(" & $i & ")\n"
+    return "L.nimCheckBool(" & $i & ")\n"
 
   if argType == "char":
-    return "L.checkNimChar(" & $i & ")\n"
+    return "L.nimCheckChar(" & $i & ")\n"
 
   if argType == "pointer":
     return "L.toUserData(" & $i & ")\n"
@@ -1156,7 +1156,7 @@ proc genPtrArg(nType: NimNode, i: int, procName: string): string {.compileTime.}
   result = "cast[ptr $1](L.toUserData($2.cint))\n" % [argType, $i]
 
 proc genRangeArg(nType: NimNode, i: int, procName: string): string {.compileTime.} =
-  result = "L.checkInteger($1.cint).int\n" % [$i]
+  result = "L.nimCheckInteger($1.cint).int\n" % [$i]
 
 proc registerTupleCheck(ctx: proxyDesc, nType: NimNode, procName: string): string {.compileTime.} =
   let name = "checkTuple$1" % [$proxyCount]
@@ -1250,7 +1250,7 @@ proc constructComplexArg(ctx: proxyDesc, mType: NimNode, i: int, procName: strin
       return constructBasicArg(nType, i, procName)
 
   if mType.kind == nnkEnumTy:
-    return "L.checkInteger($1.cint).$2\n" % [$i, $mType[0]]
+    return "L.nimCheckInteger($1.cint).$2\n" % [$i, $mType[0]]
 
   error(procName & ": unknown param type: " & $mType.kind & "\n" & mType.treeRepr)
   result = ""

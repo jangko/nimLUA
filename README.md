@@ -396,6 +396,31 @@ L.bindFunction:
   engine
 ```
 
+## **DANGEROUS ZONE**
+lua_error, lua_checkstring, lua_checkint, lua_checkudata and other lua C API that can throw error
+are dangerous functions when called from Nim context. lua_error use `longjmp` when compiled to C
+or `throw` when compiled to C++.
+
+Although Nim compiled to C, Nim have it's own stack frame. Calling lua_error and other functions
+that can throw error will disrupt Nim stack frame, and application will crash.
+
+nimLUA avoid using those dangerous functions and and use it's own set of functions that is considerably
+safe. those functions are:
+
+| lua | nimLUA |
+|-----|--------|
+| lua_error | N/A |
+| lua_checkstring | nimCheckString |
+| lua_checkinteger | nimCheckInteger |
+| lua_checkbool | nimCheckBool |
+| lua_checknumber | nimCheckNumber |
+| N/A | nimCheckCstring |
+| N/A | nimCheckChar |
+| lua_newmetatable | nimNewMetaTable |
+| lua_getmetatable | nimGetMetaTable |
+| lua_checkudata | nimCheckUData |
+---
+
 ## **HOW TO ACCESS LUA CODE FROM NIM?**
 
 still under development, contributions are welcome
