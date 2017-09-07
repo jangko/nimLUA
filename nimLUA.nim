@@ -1632,12 +1632,17 @@ proc genOvCallMany(ctx: proxyDesc, ovp: seq[ovProcElem], procName: string, flags
 proc genOvCall(ctx: proxyDesc, ovp: seq[ovProc], procName: string, flags: ovFlags, bd: bindDesc): string {.compileTime.} =
   let constructorMatter = if ovfConstructor in flags: " - 1" else: ""
   var glue = "  let numArgs = L.getTop().int$1\n" % [constructorMatter]
-  for k in ovp:
-    glue.add "  if numArgs == $1:\n" % [$k.numArgs] #first level of ov proc resolution
+  for i in 0.. <ovp.len:
+    let k = ovp[i]
+    let prefix = if i == 0: "" else: "el"
+    glue.add "  $1if numArgs == $2:\n" % [prefix, $k.numArgs] #first level of ov proc resolution
     if k.procs.len == 1:
       glue.add genOvCallSingle(ctx, k.procs[0], procName, "  ", flags, bd)
     else:
       glue.add genOvCallMany(ctx, k.procs, procName, flags, bd)
+  glue.add "  else:\n"
+  glue.add "    # error\n"
+  glue.add "    return 0\n"
   result = glue
 
 proc bindOverloadedFunction(ctx: proxyDesc, bd: bindDesc, ov: NimNode, glueProc, procName, SL: string): string {.compileTime.} =
@@ -1951,7 +1956,6 @@ proc bindObjectSingleMethod(ctx: proxyDesc, bd: bindDesc, n: NimNode, glueProc, 
   if bd.isClosure: glue.add addClosureEnv(SL, procName, n, bd)
   glue.add "proc " & glueProc & "(L: PState): cint {.cdecl.} =\n"
   glue.add "  if L.gettop() != $1: return 0\n" % [$argList.len]
-  glue.add "  if L.luaType(1) != LUA_TUSERDATA: return 0\n"
   glue.add "  var proxy = " & checkUD(subjectName, "1")
   glue.add "  if proxy.isNil: return 0\n"
   glue.add genOvCallSingle(ctx, newProcElem(retType, argList), procName, "", {ovfUseObject, ovfUseRet}, bd)
