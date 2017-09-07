@@ -311,6 +311,11 @@ proc newAvocado(name: string, id: int): Avocado =
   result.name = name
   result.id = id
 
+proc newAvocado(foo: Foos): Avocado =
+  new(result)
+  result.name = foo.name
+  result.id = 154
+  
 proc initPineapple(name: string, id: int): Pineapple =
   result.name = name
   result.id = id
