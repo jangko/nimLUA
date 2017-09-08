@@ -1844,7 +1844,7 @@ macro bindConst*(arg: varargs[untyped]): untyped =
 # -----------------------------------------------------------------------
 
 proc bindSingleConstructor(ctx: proxyDesc, bd: bindDesc, n: NimNode, glueProc, procName, subjectName: string): string {.compileTime.} =
-  if n.kind != nnkProcDef:
+  if n.kind notin {nnkProcDef, nnkTemplateDef}:
     error("bindFunction: " & procName & " is not a proc")
 
   let
