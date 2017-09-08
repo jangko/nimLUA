@@ -315,7 +315,7 @@ proc newAvocado(foo: Foos): Avocado =
   new(result)
   result.name = foo.name
   result.id = 154
-  
+
 proc initPineapple(name: string, id: int): Pineapple =
   result.name = name
   result.id = id
@@ -325,6 +325,10 @@ proc getId(self: BaseFruit): int =
 
 proc getId(self: ref BaseFruit): int =
   self.id
+
+proc getAvocado(self: PineApple, idx: int): Avocado =
+  result = nil
+  if idx == 0: result = newAvocado("nanas", 123)
 
 proc main() =
   var L = newNimLua()
@@ -543,6 +547,7 @@ proc main() =
     name(get)
     id(get)
     getId
+    getAvocado
 
   L.test("inheritance.lua")
 

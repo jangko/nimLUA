@@ -1376,8 +1376,13 @@ proc constructComplexRet(mType: NimNode, procCall, indent, procName: string): st
     if nType.kind in {nnkObjectTy, nnkRefTy}:
       let subjectName = registerObject(mType)
       var glue = indent & "var proxyret = " & newUD(subjectName)
+      if isRefType(mType):
+        # again, don't forget to zero out the ref
+        glue.add indent & "zeroMem(proxyret.ud.addr, sizeof(proxyret.ud))\n"
       glue.add indent & "proxyret.ud = $1\n" % [procCall]
-      if isRefType(mType): glue.add indent & "GC_ref(proxyret.ud)\n"
+      if isRefType(mType):
+        glue.add indent & "if proxyret.ud.isNil: return 0\n"
+        glue.add indent & "GC_ref(proxyret.ud)\n"
       glue.add indent & "L.nimGetMetatable(luaL_$1)\n" % [subjectName]
       glue.add indent & "discard L.setMetatable(-2)\n"
       return glue
@@ -1861,7 +1866,9 @@ proc bindSingleConstructor(ctx: proxyDesc, bd: bindDesc, n: NimNode, glueProc, p
   #otherwise, strange things will happened
   if isRefOrObjectType(subject): glue.add "  zeroMem(proxy, sizeof(luaL_$1Proxy))\n" % [subjectName]
   glue.add genOvCallSingle(ctx, newProcElem(retType, argList), procName, "", {ovfConstructor}, bd)
-  if isRefType(subject): glue.add "  GC_ref(proxy.ud)\n"
+  if isRefType(subject):
+    glue.add "  if proxy.ud.isNil: return 0\n"
+    glue.add "  GC_ref(proxy.ud)\n"
   glue.add "  L.nimGetMetatable(luaL_$1)\n" % [subjectName]
   glue.add "  discard L.setMetatable(-2)\n"
   glue.add "  result = 1\n"
@@ -1926,7 +1933,9 @@ proc bindOverloadedConstructor(ctx: proxyDesc, bd: bindDesc, ov: NimNode, gluePr
   #otherwise, strange things will happened
   if isRefOrObjectType(subject): glue.add "  zeroMem(proxy, sizeof(luaL_$1Proxy))\n" % [subjectName]
   glue.add genOvCall(ctx, ovl, procName, {ovfConstructor}, bd)
-  if isRefType(subject): glue.add "  GC_ref(proxy.ud)\n"
+  if isRefType(subject):
+    glue.add "  if proxy.ud.isNil: return 0\n"
+    glue.add "  GC_ref(proxy.ud)\n"
   glue.add "  L.nimGetMetatable(luaL_$1)\n" % [subjectName]
   glue.add "  discard L.setMetatable(-2)\n"
   glue.add "  result = 1\n"

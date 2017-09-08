@@ -18,3 +18,11 @@ local foo = Foos.newFoos("seamonkey")
 local av4 = Avocado.new(foo)
 print(av4.name)
 assert(av4.name == "seamonkey") -- good, it works
+
+local av5 = pn:getAvocado(0)
+assert(av5 ~= nil)
+assert(av5.name == "nanas")
+assert(av5.id == 123)
+
+local av6 = pn:getAvocado(1)
+assert(av6 == nil)
