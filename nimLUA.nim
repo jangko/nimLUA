@@ -2029,7 +2029,6 @@ proc bindObjectSingleMethod(ctx: proxyDesc, bd: bindDesc, n: NimNode, glueProc, 
   var glue = ""
   if bd.isClosure: glue.add addClosureEnv(SL, procName, n, bd)
   glue.add "proc " & glueProc & "(L: PState): cint {.cdecl.} =\n"
-  glue.add "  if L.gettop() != $1: return 0\n" % [$argList.len]
   glue.add "  var proxy = " & checkUD(subjectName, "1", $subject)
   glue.add "  if proxy.isNil: return 0\n"
   glue.add genOvCallSingle(ctx, newProcElem(retType, argList), procName, "", {ovfUseObject, ovfUseRet}, bd)
@@ -2069,8 +2068,6 @@ proc bindObjectOverloadedMethod(ctx: proxyDesc, bd: bindDesc, ov: NimNode, glueP
     return glue
 
   glue.add "proc " & glueProc & "(L: PState): cint {.cdecl.} =\n"
-  glue.add "  if L.gettop() < 1: return 0\n"
-  glue.add "  if L.luaType(1) != LUA_TUSERDATA: return 0\n"
   glue.add "  var proxy = " & checkUD(subjectName, "1", $subject)
   glue.add "  if proxy.isNil: return 0\n"
   glue.add genOvCall(ctx, ovl, procName, {ovfUseObject, ovfUseRet}, bd)
@@ -2086,8 +2083,6 @@ proc bindGetter(ctx: proxyDesc, glueProc, propName, subjectName: string, propTyp
     procName = $subject & "." & propName
 
   glue.add "proc " & glueProc & "(L: PState): cint {.cdecl.} =\n"
-  glue.add "  if L.gettop() != 1: return 0\n"
-  glue.add "  if L.luaType(1) != LUA_TUSERDATA: return 0\n"
   glue.add "  var proxy = " & checkUD(subjectName, "1", $subject)
   glue.add "  if proxy.isNil: return 0\n"
   glue.add constructRet(propType, procCall, "  ", procName)
@@ -2103,8 +2098,6 @@ proc bindSetter(ctx: proxyDesc, glueProc, propName, subjectName: string, propTyp
     procName = $subject & "." & propName
 
   glue.add "proc " & glueProc & "(L: PState): cint {.cdecl.} =\n"
-  glue.add "  if L.gettop() != 2: return 0\n"
-  glue.add "  if L.luaType(1) != LUA_TUSERDATA: return 0\n"
   glue.add "  var proxy = " & checkUD(subjectName, "1", $subject)
   glue.add "  if proxy.isNil: return 0\n"
   glue.add "  $1 = $2" % [procCall, constructArg(ctx, propType, 2, procName, needCheck)]
@@ -2192,8 +2185,6 @@ proc bindObjectImpl*(ctx: proxyDesc): NimNode {.compileTime.} =
 
   if isRefType(subject) and not hasName("dtor" & $subject):
     glue.add "proc $1_destructor(L: PState): cint {.cdecl.} =\n" % [subjectName]
-    glue.add "  if L.gettop() != 1: return 0\n"
-    glue.add "  if L.luaType(1) != LUA_TUSERDATA: return 0\n"
     glue.add "  var proxy = " & checkUD(subjectName, "1", $subject)
     glue.add "  if proxy.isNil: return 0\n"
     glue.add "  GC_unref(proxy.ud)\n"
