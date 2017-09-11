@@ -86,7 +86,19 @@ type
     nloDebug
     nloAddMember
 
+  NLError* = object
+    source: string
+    currentLine: int
+    msg: string
+
+  NLErrorFunc* = proc(ctx: pointer, err: NLError) {.nimcall.}
+
 let globalClosure {.compileTime.} = "_gCLV"
+
+const
+  IDRegion = 0xDEAF
+  IDErrorContext = IDRegion - 1
+  IDErrorFunc = IDRegion - 2
 
 #counter that will be used to generate unique intermediate macro name
 #and avoid name collision
@@ -112,6 +124,32 @@ macro nimLuaOptions*(opt: nlOptions, mode: bool): untyped =
     gOptions.excl convOpt(opt)
 
   result = newEmptyNode()
+
+proc toString(c: LUA_TYPE): string =
+  const typeName = ["NIL", "BOOLEAN", "LIGHTUSERDATA", "NUMBER", "STRING",
+    "TABLE", "FUNCTION", "USERDATA", "THREAD", "NUMTAGS"]
+  if c in {LNIL..LNUMTAGS}:
+    return typeName[ord(c)]
+  elif c == LNONE:
+    return "NONE"
+  else:
+    return "INVALID"
+
+proc nimDebug(L: PState, idx: cint, eType: string) =
+  var dbg: TDebug
+  if L.getStack(1, dbg.addr) != 0:
+    if L.getInfo("Sln", dbg.addr) != 0:
+      let gType = L.getType(idx).toString()
+      let err = NLError(source: $dbg.source, currentLine: dbg.currentLine,
+        msg: "expected `$1`, got `$2`" % [eType, $gType])
+      L.pushLightUserData(cast[pointer](IDErrorContext))
+      L.rawGet(LUA_REGISTRYINDEX) # get correct error context
+      let errCtx = L.toUserData(-1)
+      L.pushLightUserData(cast[pointer](IDErrorFunc))
+      L.rawGet(LUA_REGISTRYINDEX) # get correct error function
+      let errFunc = cast[NLErrorFunc](L.toUserData(-1))
+      L.pop(2)
+      errFunc(errCtx, err)
 
 #inside macro, const bool become nnkIntLit, that's why we need to use
 #this trick to test for bool type using 'when internalTestForBOOL(n)'
@@ -631,15 +669,15 @@ proc registerObject(subject: NimNode): string {.compileTime.} =
   let subjectName = name & subjectID
   nameList.add prefixedName
   var glue = "const\n"
-  glue.add "  luaL_$1 = 0xDEAF+$2\n" % [subjectName, subjectID]
+  glue.add "  luaL_$1 = $2+$3\n" % [subjectName, $IDRegion, subjectID]
   glue.add "type\n"
   glue.add "  luaL_$1Proxy = object\n" % [subjectName]
   glue.add "    ud: $1\n" % [name]
   gContext.add glue
   result = subjectName
 
-proc checkUD(s, n: string): string {.compileTime.} =
-  result = "cast[ptr luaL_$1Proxy](L.nimCheckUData($2.cint, luaL_$1, \"$1\"))\n" % [s, n]
+proc checkUD(s, n, r: string): string {.compileTime.} =
+  result = "cast[ptr luaL_$1Proxy](L.nimCheckUData($2.cint, luaL_$1, \"$3\"))\n" % [s, n, r]
 
 proc newUD(s: string): string {.compileTime.} =
   result = "cast[ptr luaL_$1Proxy](L.newUserData(sizeof(luaL_$1Proxy)))\n" % [s]
@@ -695,11 +733,27 @@ proc nimLuaPanic(L: PState): cint {.cdecl.} =
   L.pop(1)
   return 0
 
+proc stdNimLuaErrFunc(ctx: pointer, err: NLError) =
+  echo "$1:$2 warning: $3" % [err.source, $err.currentLine, err.msg]
+
+proc NLSetErrorHandler*(L: PState, errFunc: NLErrorFunc) =
+  L.pushLightUserData(cast[pointer](IDErrorFunc))
+  L.pushLightUserData(cast[pointer](errFunc))
+  L.rawSet(LUA_REGISTRYINDEX)
+
+proc NLSetErrorContext*(L: PState, errCtx: pointer) =
+  L.pushLightUserData(cast[pointer](IDErrorContext))
+  L.pushLightUserData(errCtx)
+  L.rawSet(LUA_REGISTRYINDEX)
+
 #call this before you use this library
 proc newNimLua*(readOnlyEnum = false): PState =
   var L = newState()
   L.openLibs
   discard L.atPanic(nimLuaPanic)
+
+  L.NLSetErrorHandler(stdNimLuaErrFunc)
+  L.NLSetErrorContext(nil)
 
   let roEnum = """
 function readonlytable(table)
@@ -831,27 +885,37 @@ macro bindEnum*(arg: varargs[untyped]): untyped =
 # ----------------------------- bindFunction ------------------------------
 # -------------------------------------------------------------------------
 
-#runtime type check helper for string
+# these are runtime type check helper for each type
+# supported by Nim and Lua
 proc nimCheckString*(L: PState, idx: cint): string =
   if L.isString(idx) != 0: result = L.toString(idx)
-  else: result = ""
+  else:
+    L.nimDebug(idx.cint, "string")
+    result = ""
 
-#runtime type check helper for bool
 proc nimCheckBool*(L: PState, idx: cint): bool =
   if L.isBoolean(idx): result = if L.toBoolean(idx) == 0: false else: true
-  else: result = false
+  else:
+    L.nimDebug(idx.cint, "bool")
+    result = false
 
 proc nimCheckInteger*(L: PState, idx: cint): int =
   if L.isInteger(idx) != 0: result = L.toInteger(idx).int
-  else: result = 0
+  else:
+    L.nimDebug(idx.cint, "int")
+    result = 0
 
 proc nimCheckNumber*(L: PState, idx: cint): float64 =
   if L.isNumber(idx) != 0: result = L.toNumber(idx).float64
-  else: result = 0.0
+  else:
+    L.nimDebug(idx.cint, "float")
+    result = 0.0
 
 proc nimCheckCstring*(L: PState, idx: cint): cstring =
   if L.isString(idx) != 0: result = L.toLString(idx, nil)
-  else: result = nil
+  else:
+    L.nimDebug(idx.cint, "cstring")
+    result = nil
 
 proc nimCheckChar*(L: PState, idx: cint): char =
   if L.isInteger(idx) != 0: result = L.toInteger(idx).char
@@ -885,6 +949,7 @@ proc nimCheckUData*(L: PState, idx, key: int, name: string): pointer =
         return p
 
   # else error
+  L.nimDebug(idx.cint, name)
   result = nil
 
 let
@@ -1194,7 +1259,7 @@ proc constructComplexArg(ctx: proxyDesc, mType: NimNode, i: int, procName: strin
     let nType = getImpl(mType.symbol)[2]
     if nType.kind in {nnkObjectTy, nnkRefTy}:
       needCheck = "if not $1.isNil:\n"
-      return checkUD(registerObject(mType), $i)
+      return checkUD(registerObject(mType), $i, $mType)
 
     if nType.kind == nnkDistinctTy:
       return constructArg(ctx, nType[0], i, procName, needcheck)
@@ -1244,7 +1309,7 @@ proc constructComplexArg(ctx: proxyDesc, mType: NimNode, i: int, procName: strin
     let nType = getType(mType[0])
     if nType.kind in {nnkObjectTy, nnkRefTy}:
       needCheck = "if not $1.isNil:\n"
-      return checkUD(registerObject(mType[0]), $i)
+      return checkUD(registerObject(mType[0]), $i, $mType[0])
     if nType.kind == nnkSym:
       outValList.add constructBasicRet(nType, "arg" & $(i-1), "", procName)
       return constructBasicArg(nType, i, procName)
@@ -1965,7 +2030,7 @@ proc bindObjectSingleMethod(ctx: proxyDesc, bd: bindDesc, n: NimNode, glueProc, 
   if bd.isClosure: glue.add addClosureEnv(SL, procName, n, bd)
   glue.add "proc " & glueProc & "(L: PState): cint {.cdecl.} =\n"
   glue.add "  if L.gettop() != $1: return 0\n" % [$argList.len]
-  glue.add "  var proxy = " & checkUD(subjectName, "1")
+  glue.add "  var proxy = " & checkUD(subjectName, "1", $subject)
   glue.add "  if proxy.isNil: return 0\n"
   glue.add genOvCallSingle(ctx, newProcElem(retType, argList), procName, "", {ovfUseObject, ovfUseRet}, bd)
   result = glue
@@ -2006,7 +2071,7 @@ proc bindObjectOverloadedMethod(ctx: proxyDesc, bd: bindDesc, ov: NimNode, glueP
   glue.add "proc " & glueProc & "(L: PState): cint {.cdecl.} =\n"
   glue.add "  if L.gettop() < 1: return 0\n"
   glue.add "  if L.luaType(1) != LUA_TUSERDATA: return 0\n"
-  glue.add "  var proxy = " & checkUD(subjectName, "1")
+  glue.add "  var proxy = " & checkUD(subjectName, "1", $subject)
   glue.add "  if proxy.isNil: return 0\n"
   glue.add genOvCall(ctx, ovl, procName, {ovfUseObject, ovfUseRet}, bd)
   glue.add "  discard L.error(\"$1: invalid param count\")\n" % [procName]
@@ -2023,7 +2088,7 @@ proc bindGetter(ctx: proxyDesc, glueProc, propName, subjectName: string, propTyp
   glue.add "proc " & glueProc & "(L: PState): cint {.cdecl.} =\n"
   glue.add "  if L.gettop() != 1: return 0\n"
   glue.add "  if L.luaType(1) != LUA_TUSERDATA: return 0\n"
-  glue.add "  var proxy = " & checkUD(subjectName, "1")
+  glue.add "  var proxy = " & checkUD(subjectName, "1", $subject)
   glue.add "  if proxy.isNil: return 0\n"
   glue.add constructRet(propType, procCall, "  ", procName)
   glue.add "  return 1\n"
@@ -2040,7 +2105,7 @@ proc bindSetter(ctx: proxyDesc, glueProc, propName, subjectName: string, propTyp
   glue.add "proc " & glueProc & "(L: PState): cint {.cdecl.} =\n"
   glue.add "  if L.gettop() != 2: return 0\n"
   glue.add "  if L.luaType(1) != LUA_TUSERDATA: return 0\n"
-  glue.add "  var proxy = " & checkUD(subjectName, "1")
+  glue.add "  var proxy = " & checkUD(subjectName, "1", $subject)
   glue.add "  if proxy.isNil: return 0\n"
   glue.add "  $1 = $2" % [procCall, constructArg(ctx, propType, 2, procName, needCheck)]
   glue.add "  return 0\n"
@@ -2129,7 +2194,7 @@ proc bindObjectImpl*(ctx: proxyDesc): NimNode {.compileTime.} =
     glue.add "proc $1_destructor(L: PState): cint {.cdecl.} =\n" % [subjectName]
     glue.add "  if L.gettop() != 1: return 0\n"
     glue.add "  if L.luaType(1) != LUA_TUSERDATA: return 0\n"
-    glue.add "  var proxy = " & checkUD(subjectName, "1")
+    glue.add "  var proxy = " & checkUD(subjectName, "1", $subject)
     glue.add "  if proxy.isNil: return 0\n"
     glue.add "  GC_unref(proxy.ud)\n"
     glue.add "  proxy.ud = nil\n"

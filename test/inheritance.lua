@@ -26,3 +26,6 @@ assert(av5.id == 123)
 
 local av6 = pn:getAvocado(1)
 assert(av6 == nil)
+
+local av7 = Avocado.new("garbage")
+assert(av7 == nil)

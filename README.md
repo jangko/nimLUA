@@ -419,7 +419,25 @@ safe. those functions are:
 | lua_newmetatable | nimNewMetaTable |
 | lua_getmetatable | nimGetMetaTable |
 | lua_checkudata | nimCheckUData |
----
+
+## **Error Handling**
+```Nim
+  NLError* = object
+    source: string
+    currentLine: int
+    msg: string
+
+  NLErrorFunc* = proc(ctx: pointer, err: NLError) {.nimcall.}
+
+proc NLSetErrorHandler*(L: PState, errFunc: NLErrorFunc)
+proc NLSetErrorContext*(L: PState, errCtx: pointer)
+```
+
+This is actually not a real error handler, because you cannot use raise exception.
+The purpose of this function is to provide information to user about wrong argument type
+passed from Lua to Nim.
+
+nimLUA already provide a default error handler in case you forget to provide one.
 
 ## **HOW TO ACCESS LUA CODE FROM NIM?**
 
