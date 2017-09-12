@@ -330,6 +330,57 @@ proc getAvocado(self: PineApple, idx: int): Avocado =
   result = nil
   if idx == 0: result = newAvocado("nanas", 123)
 
+proc testFromLua(L: PState) =
+  type
+    Layout = ref object
+      name: string
+
+  proc newLayout(): Layout =
+    new(result)
+    result.name = "The Layout"
+    
+  L.bindObject(Layout):
+    name(get)
+
+  var lay = newLayout()
+  
+  # store Layout reference
+  L.pushLightUserData(cast[pointer](NLMaxID)) # push key
+  L.pushLightUserData(cast[pointer](lay)) # push value
+  L.setTable(LUA_REGISTRYINDEX)           # registry[lay.addr] = lay
+
+  # register the only entry point of layout hierarchy to lua
+  proc layoutProxy(L: PState): cint {.cdecl.} =
+    getRegisteredType(Layout, mtName, pxName)
+    var ret = cast[ptr pxName](L.newUserData(sizeof(pxName)))
+
+    # retrieve Layout
+    L.pushLightUserData(cast[pointer](NLMaxID)) # push key
+    L.getTable(LUA_REGISTRYINDEX)           # retrieve value
+    ret.ud = cast[Layout](L.toUserData(-1)) # convert to layout
+    L.pop(1) # remove userdata
+    GC_ref(ret.ud)
+    L.nimGetMetaTable(mtName)
+    discard L.setMetatable(-2)
+    return 1
+
+  L.pushCfunction(layoutProxy)
+  L.setGlobal("getLayout")  
+    
+  #[L.getGlobal("View")     # get View table
+  discard L.pushString("onClick") # push the key "onClick"
+  L.rawGet(-2)            # get the function
+  if L.isNil(-1):
+    echo "onClick not found"
+  else:
+    var proxy = L.getUD(lay.root) # push first argument
+    assert(proxy == lay.root)
+    if L.pcall(1, 0, 0) != 0:
+      let errorMsg = L.toString(-1)
+      L.pop(1)
+      lay.context.otherError(errLua, errorMsg)
+  L.pop(1) # pop View Table]#
+    
 proc main() =
   var L = newNimLua()
 
@@ -551,6 +602,8 @@ proc main() =
 
   L.test("inheritance.lua")
 
+  L.testFromLua()
+  
   L.close()
 
 main()

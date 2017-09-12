@@ -674,7 +674,7 @@ proc registerObject(subject: NimNode): string {.compileTime.} =
   glue.add "    ud: $1\n" % [name]
   gContext.add glue
   result = subjectName
-
+  
 proc checkUD(s, n: string): string {.compileTime.} =
   result = "cast[ptr NL_$1Proxy](L.nimCheckUData($2.cint, NL_$1, NL_$1name))\n" % [s, n]
 
@@ -1443,7 +1443,7 @@ proc constructComplexRet(mType: NimNode, procCall, indent, procName: string): st
       if isRefType(mType):
         glue.add indent & "var pxret: NL_$1Proxy\n" % [subjectName]
         glue.add indent & "pxret.ud = $1\n" % [procCall]
-        glue.add indent & "let proxyret = getUD[NL_$1Proxy](L, pxret)\n" % [subjectName]
+        glue.add indent & "let proxyret = getRegisteredUD[NL_$1Proxy](L, pxret)\n" % [subjectName]
         glue.add indent & "if proxyret.isNil: return 0\n"
       else:
         glue.add indent & "var proxyret = " & newUD(subjectName)
@@ -1493,7 +1493,7 @@ proc constructComplexRet(mType: NimNode, procCall, indent, procName: string): st
       if getType(mType[0]).kind == nnkRefTy:
         glue.add indent & "var pxvar: NL_$1Proxy\n" % [subjectName]
         glue.add indent & "pxvar.ud = $1\n" % [procCall]
-        glue.add indent & "let proxy = getUD[NL_$1Proxy](L, pxvar)\n" % [subjectName]
+        glue.add indent & "let proxy = getRegisteredUD[NL_$1Proxy](L, pxvar)\n" % [subjectName]
         glue.add indent & "if proxy.isNil: return 0\n"
       else:
         glue.add indent & "var proxy = " & newUD(subjectName)
@@ -1938,7 +1938,7 @@ proc bindSingleConstructor(ctx: proxyDesc, bd: bindDesc, n: NimNode, glueProc, p
   if isRefType(subject):
     glue.add "  var proxy: NL_$1Proxy\n" % [subjectName]
     glue.add genOvCallSingle(ctx, newProcElem(retType, argList), procName, "", {ovfConstructor}, bd)
-    glue.add "  let ret = getUD[NL_$1Proxy](L, proxy)\n" % [subjectName]
+    glue.add "  let ret = getRegisteredUD[NL_$1Proxy](L, proxy)\n" % [subjectName]
     glue.add "  if ret.isNil: return 0\n"
   else:
     glue.add "  var proxy = " & newUD(subjectName)
@@ -1980,7 +1980,7 @@ proc isDescendant(a, b: NimNode): bool {.compileTime.} =
 proc eqTypeOrDescendant(a, b: NimNode): bool {.compileTime.} =
   result = eqType(a, b) or isDescendant(a, b)
 
-proc getUD*[T](L: PState, proxy: T): ptr T =
+proc getRegisteredUD*[T](L: PState, proxy: T): ptr T =
   # get ref type userdata from REGISTRYINDEX
   # if it's already there or create one if it's not there
   # this help us to communicate with lua side from Nim
@@ -1990,7 +1990,9 @@ proc getUD*[T](L: PState, proxy: T): ptr T =
   L.pushLightUserData(cast[pointer](proxy.ud))
   L.rawGet(LUA_REGISTRYINDEX)
   if not L.isNil(-1): # name already in use?
-    return cast[ptr T](L.toUserData(-1))
+    result = cast[ptr T](L.toUserData(-1))
+    result.ud = proxy.ud
+    return result
 
   L.pop(1) # pop nil
   result = cast[ptr T](L.newUserData(sizeof(T)))
@@ -2032,7 +2034,7 @@ proc bindOverloadedConstructor(ctx: proxyDesc, bd: bindDesc, ov: NimNode, gluePr
   if isRefType(subject):
     glue.add "  var proxy: NL_$1Proxy\n" % [subjectName]
     glue.add genOvCall(ctx, ovl, procName, {ovfConstructor}, bd)
-    glue.add "  let ret = getUD[NL_$1Proxy](L, proxy)\n" % [subjectName]
+    glue.add "  let ret = getRegisteredUD[NL_$1Proxy](L, proxy)\n" % [subjectName]
     glue.add "  if ret.isNil: return 0\n"
   else:
     glue.add "  var proxy = " & newUD(subjectName)
@@ -2257,3 +2259,26 @@ macro getRegisteredType*(obj: typed, metaTableName, proxyName: untyped): untyped
   var glue = "type $1 = NL_$2Proxy\n" % [$proxyName, subjectName]
   glue.add "const $1 = NL_$2\n" % [$metaTableName, subjectName]
   result = parseCode(glue)
+
+macro getRegisteredProxy*(obj: typed, proxyName: untyped): untyped =
+  let subjectName = registerObject(obj)
+  var glue = "type $1 = NL_$2Proxy\n" % [$proxyName, subjectName]
+  result = parseCode(glue)
+
+macro getRegisteredMetaTable*(obj: typed, metaTableName: untyped): untyped =
+  let subjectName = registerObject(obj)
+  var glue = "const $1 = NL_$2\n" % [$metaTableName, subjectName]
+  result = parseCode(glue)
+
+macro instantiateRegisteredProxy(obj: typed): untyped =
+  let n = getTypeImpl(obj)
+  assert(n.kind == nnkBracketExpr)
+  var glue = "type pxName = object\n"
+  glue.add "  ud: $1\n" % [$n[1]]
+  glue.add "let px = pxName(ud: objRef)\n"
+  glue.add "let proxy = getRegisteredUD[pxName](L, px)\n"
+  glue.add "result = proxy.ud\n"
+  result = parseCode(glue)
+
+proc getUD*[T: ref](L: PState, objRef: T): T =
+  instantiateRegisteredProxy(T)
