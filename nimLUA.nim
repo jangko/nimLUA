@@ -116,6 +116,7 @@ var
   outValList {.compileTime.} : seq[string]
   gContext   {.compileTime.} = ""
   gOptions   {.compileTime.} = {nloAddMember}
+  objectMTList {.compileTime.} = newSeq[string]()
 
 proc convOpt(a: NimNode): nlOptions {.compileTime.} =
   case $a:
@@ -681,6 +682,7 @@ proc registerObject(subject: NimNode): string {.compileTime.} =
   let subjectID = $nameList.len
   let subjectName = name & subjectID
   nameList.add prefixedName
+  objectMTList.add "$1.nimNewMetatable(NL_$2)\n" % ["$1", subjectName]
   var glue = "const\n"
   glue.add "  NL_$1 = $2+$3\n" % [subjectName, $IDRegion, subjectID]
   glue.add "  NL_$1name = \"$2\"\n" % [subjectName, name]
@@ -689,6 +691,12 @@ proc registerObject(subject: NimNode): string {.compileTime.} =
   glue.add "    ud: $1\n" % [name]
   gContext.add glue
   result = subjectName
+
+proc genMetaTableList(SL: string): string {.compileTime.} =
+  result = ""
+  for n in objectMTList:
+    result.add(n % [SL])
+  objectMTList.setLen 0
 
 proc checkUD(s, n: string): string {.compileTime.} =
   result = "cast[ptr NL_$1Proxy](L.nimCheckUData($2.cint, NL_$1, NL_$1name))\n" % [s, n]
@@ -935,18 +943,17 @@ proc nimCheckChar*(L: PState, idx: cint): char =
   if L.isInteger(idx) != 0: result = L.toInteger(idx).char
   else: result = chr(0)
 
-proc nimNewMetaTable*(L: PState, key: int): int =
+proc nimNewMetaTable*(L: PState, key: int) =
   L.pushLightUserData(cast[pointer](key))
   L.rawGet(LUA_REGISTRYINDEX)
   if not L.isNil(-1): # name already in use?
-    return 0 #leave previous value on top, but return 0
+    L.pop(1)
+    return
 
   L.pop(1) # pop nil
-  L.newTable() # create metatable
   L.pushLightUserData(cast[pointer](key))
-  L.pushValue(-2)
+  L.newTable() # create metatable
   L.rawSet(LUA_REGISTRYINDEX)
-  result = 1
 
 proc nimGetMetaTable*(L: PState, key: int) =
   L.pushLightUserData(cast[pointer](key))
@@ -1803,7 +1810,8 @@ proc bindFunctionImpl*(ctx: proxyDesc): NimNode {.compileTime.} =
   if exportLib:
     glue.add SL & ".setGlobal(\"" & libName & "\")\n"
 
-  result = parseCode(gContext & glue)
+  let mtList = genMetaTableList(SL)
+  result = parseCode(gContext & mtList & glue)
 
 #call this macro with following params pattern:
 # * bindFunction(luaState, "libName", ident1, ident2, .., identN)
@@ -2188,7 +2196,7 @@ proc bindObjectImpl*(ctx: proxyDesc): NimNode {.compileTime.} =
 
   gContext.setLen 0
   let subjectName = registerObject(subject)
-  var glue = "discard $1.nimNewMetatable(NL_$2)\n" % [SL, subjectName]
+  var glue = ""
   var regs = "var regs$1$2 = [\n" % [subjectName, $regsCount]
 
   for i in 0..arg.len-1:
@@ -2251,6 +2259,7 @@ proc bindObjectImpl*(ctx: proxyDesc): NimNode {.compileTime.} =
   regs.add "]\n"
 
   glue.add regs
+  glue.add "$1.nimGetMetatable(NL_$2)\n" % [SL, subjectName]
   glue.add "$1.setFuncs(cast[ptr luaL_reg](addr(regs$2$3)), 0)\n" % [SL, subjectName, $regsCount]
 
   if ctx.propList.len > 0:
@@ -2261,7 +2270,8 @@ proc bindObjectImpl*(ctx: proxyDesc): NimNode {.compileTime.} =
   glue.add "$1.setGlobal(\"$2\")\n" % [SL, newName]
 
   inc regsCount
-  result = parseCode(gContext & glue)
+  let mtList = genMetaTableList(SL)
+  result = parseCode(gContext & mtList & glue)
 
 macro bindObject*(arg: varargs[untyped]): untyped =
   result = genProxyMacro(arg, {nlbRegisterObject, nlbRegisterClosure, nlbRegisterGeneric}, "Object")
