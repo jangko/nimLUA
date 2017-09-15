@@ -309,6 +309,31 @@ It's ok to call bindObject without any additional member/method if you want to
 register object type and use it later. For example if you want to create your own
 object constructor
 
+#### **4.2. bindObject for opaque C pointer**
+
+Usually a C library have constructor(s) and destructor function.
+The constructor will return an opaque pointer.
+
+On Nim side, we usually use something like:
+
+```Nim
+type
+  CContext* = distinct pointer
+
+proc createCContext*(): CContext {.cdecl, importc.}
+proc deleteCContext*(ctx: CContext) {.cdecl, importc.}
+```
+
+Of course this is not an object or ref object, but we treat it as an object in this case.
+Therefore bindObject will work like usual.
+Only this time, we also need to specify the destructor function using `~` operator.
+
+```Nim
+L.bindObject(CContext):
+  createCContext -> "create"
+  ~deleteCContext
+```
+
 ## **PASSING BY REFERENCE**
 
 Lua basic data types cannot be passed by reference, but Nim does
