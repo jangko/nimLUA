@@ -472,9 +472,9 @@ proc genProxyMacro(arg: NimNode, opts: bindFlags, proxyName: string): NimNode {.
   if libKind == nnkStrLit:
     nlb.add "  ctx.libName = newStrLitNode(\"$1\")\n" % [libName]
   elif libKind == nnkIdent:
-    nlb.add "  ctx.libName = newIdentNode(!\"$1\")\n" % [libName]
+    nlb.add "  ctx.libName = newIdentNode(toNimIdent(\"$1\"))\n" % [libName]
   elif registerObject:
-    nlb.add "  ctx.libName = newIdentNode(!\"$1\")\n" % [objectNewName]
+    nlb.add "  ctx.libName = newIdentNode(toNimIdent(\"$1\"))\n" % [objectNewName]
   else:
     nlb.add "  ctx.libName = newEmptyNode()\n"
 
@@ -616,7 +616,7 @@ proc proxyMixer*(ctx: proxyDesc, proxyName: string): NimNode {.compileTime.} =
   if ctx.libName.kind == nnkStrLit:
     nlb.add "  ctx.libName = newStrLitNode(\"$1\")\n" % [$ctx.libName]
   elif ctx.libName.kind == nnkIdent:
-    nlb.add "  ctx.libName = newIdentNode(!\"$1\")\n" % [$ctx.libName]
+    nlb.add "  ctx.libName = newIdentNode(toNimIdent(\"$1\"))\n" % [$ctx.libName]
   else:
     nlb.add "  ctx.libName = newEmptyNode()\n"
 
@@ -719,7 +719,7 @@ proc addClosureEnv(SL, procName: string, n: NimNode, bd: bindDesc, ovIdx: int = 
   var glue = ""
 
   var params = copy(n[3])
-  params.add newIdentDefs(newIdentNode(!"clEnv"), bindSym"pointer")
+  params.add newIdentDefs(newIdentNode(toNimIdent("clEnv")), bindSym"pointer")
   let clv = params.toStrLit.strVal
 
   glue.add "type clsTyp$1$2 = proc$3 {.nimCall.}\n" % [$proxycount, $ovIdx, clv]
@@ -1731,7 +1731,7 @@ proc genOvCallMany(ctx: proxyDesc, ovp: seq[ovProcElem], procName: string, flags
 
 proc genOvCall(ctx: proxyDesc, ovp: seq[ovProc], procName: string, flags: ovFlags, bd: bindDesc): string {.compileTime.} =
   var glue = "  let numArgs = L.getTop().int\n"
-  for i in 0.. <ovp.len:
+  for i in 0..<ovp.len:
     let k = ovp[i]
     let prefix = if i == 0: "" else: "el"
     glue.add "  $1if numArgs == $2:\n" % [prefix, $k.numArgs] #first level of ov proc resolution
