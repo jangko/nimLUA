@@ -1,6 +1,6 @@
 import nimLUA, os, strutils
 
-type
+#[type
   GENE {.pure.} = enum
     ADENINE, CYTOSINE, GUANINE, THYMINE
 
@@ -12,9 +12,9 @@ type
 
   `poncho` = enum
     `glucho`, `becho`
-
+]#
 const
-  MANGOES = 10.0
+#[  MANGOES = 10.0
   PAPAYA = 11.0'f64
   LEMON = 12.0'f32
   MAX_DASH_PATTERN = 8
@@ -31,18 +31,18 @@ const
   STAIR = [123, 456]
   HELIX = [123.4, 567.8]
   GREET = "hello world"
-  connected = true
+  connected = true]#
   mime = {
     "apple": "fruit",
     "men": "woman"
   }
-
+#[
   programme = {
     1: "state",
     2: "power",
     3: "result"
-  }
-
+  }]#
+#[
 proc addv(a: seq[int]): int =
   result = 0
   for k in a:
@@ -59,7 +59,7 @@ proc tpm(s: string, v: string): string =
 proc rootv(u: float): seq[float] =
   result = newSeq[float](10)
   for i in 0..9: result[i] = u * i.float
-
+]#
 proc test(L: PState, fileName: string) =
   if L.doFile("test" & DirSep & fileName) != 0.cint:
     echo L.toString(-1)
@@ -67,7 +67,7 @@ proc test(L: PState, fileName: string) =
     quit()
   else:
     echo fileName & " .. OK"
-
+#[
 proc `++`(a, b: int): int = a + b
 
 type
@@ -282,7 +282,7 @@ proc newShip(): Ship =
   result.speed = 11
   result.power = 12
   result.engine = 3
-
+]#
 #type
 #  Car = ref object
 #    speed: int
@@ -297,7 +297,7 @@ proc newShip(): Ship =
 #  oilSet = set[OIL]
 #  Poil = ptr OIL
 #  roil = range[5..10]
-
+#[
 type
   BaseFruit = object of RootObj
     id: int
@@ -366,7 +366,7 @@ proc testFromLua(L: PState) =
 
   L.pushCfunction(layoutProxy)
   L.setGlobal("getLayout")  
-    
+]#    
   #[L.getGlobal("View")     # get View table
   discard L.pushString("onClick") # push the key "onClick"
   L.rawGet(-2)            # get the function
@@ -384,225 +384,227 @@ proc testFromLua(L: PState) =
 proc main() =
   var L = newNimLua()
 
-  L.bindConst:
-    MANGOES
-    PAPAYA
-    LEMON
-    MAX_DASH_PATTERN
-    CATHODE
-    ANODE
-
-  L.bindConst("mmm"):
-    ELECTRON16
-    PROTON16
-    ELECTRON32
-    PROTON32
-    ELECTRON64
-    PROTON64
-    connected
-
+  #L.bindConst:
+  #  MANGOES
+  #  PAPAYA
+  #  LEMON
+  #  MAX_DASH_PATTERN
+  #  CATHODE
+  #  ANODE
+  #
+  #L.bindConst("mmm"):
+  #  ELECTRON16
+  #  PROTON16
+  #  ELECTRON32
+  #  PROTON32
+  #  ELECTRON64
+  #  PROTON64
+  #  connected
+  
+  nimLuaOptions(nloDebug, true)
   L.bindConst("ccc"):
-    LABEL_STYLE_CH
-    INFO_FIELD
-    STAIR
-    HELIX
-    GREET
+    #LABEL_STYLE_CH
+    #INFO_FIELD
+    #STAIR
+    #HELIX
+    #GREET
     mime
-    programme
-
-  L.bindConst:
-    MANGOES -> "MANGGA"
-    PAPAYA -> "PEPAYA"
-    LEMON -> "JERUK"
-
-  L.bindConst("buah"):
-    MANGOES -> "MANGGA"
-    PAPAYA -> "PEPAYA"
-    LEMON -> "JERUK"
-  L.test("constants.lua")
-
-  L.bindEnum(GENE)
-  L.test("single_scoped_enum.lua")
-
-  L.bindEnum(GENE -> "DNA", ATOM -> GLOBAL, FRUIT)
-  L.test("scoped_and_global_enum.lua")
-
-  L.bindEnum:
-    ATOM
-    GENE
-    FRUIT
-    `poncho`
-  L.test("scoped_enum.lua")
-
-  L.bindFunction(mulv, tpc, tpm -> "goodMan")
-  L.test("free_function.lua")
-
-  L.bindFunction("gum"):
-    mulv
-    tpc
-    tpm -> "goodMan"
-    `++`
-  L.test("scoped_function.lua")
-
-  L.bindObject(Foo):
-    newFoo -> constructor
-    addv
-    addk -> "add"
-    setAcid2
-    setAcid
-    newFoo
-    newFoo -> "whatever"
-  L.test("fun.lua")
-
-  L.bindFunction("mac"):
-    machine
-  L.test("ov_func.lua")
-
-  L.bindObject(Acid):
-    makeAcid -> constructor
-    setLen
-    getLen
-
-  L.bindFunction("acd"):
-    makeAcid
-
-  L.bindFunction(makeAcid)
-  L.bindObject(Fish):
-    fishing -> constructor
-
-  L.bindObject(Fish):
-    grill
-    fry
-
-  L.bindFunction("gem", mining)
-  L.bindFunction("gem", polish)
-  L.bindConst("gem", ANODE)
-
-  L.bindObject(Fish -> "kakap"):
-    grill
-    fry
-  L.test("regular_object.lua")
-
-  L.bindFunction(GLOBAL):
-    mulv
-
-  L.bindFunction("GLOBAL", mulv, subb)
-
-  L.bindConst(GLOBAL):
-    LEMON
-
-  L.bindConst("GLOBAL"):
-    LEMON
-
-  L.bindEnum:
-    GENE -> GLOBAL
-    FRUIT -> "GLOBAL"
-  L.test("namespace.lua")
-
-  L.bindFunction("arr"):
-    chemA
-    geneA
-    fruitA
-    geneB
-    geneC
-    fruitC
-    chemC
-  L.test("array_param_ret.lua")
-
-  L.bindFunction("proto_banana"):
-    fruitE -> "radiate"
-  L.test("enum_param_ret.lua")
-
-  L.bindFunction("set"):
-    fruitS
-    alphaS
-    fruitSA
-    alphaSA
-  L.test("set_param_ret.lua")
-
-  L.bindFunction("seq"):
-    fruitQ
-    fruitQA
-    geneQ
-    geneQA
-    stringQ
-    stringQA
-    rootv
-  L.test("sequence_param_ret.lua")
-
-  L.bindFunction("ptr"):
-    seedP
-    geneP
-    genePA
-    intP
-    intPA
-    genePPA
-    intPPA
-    genePPB
-    intPPB
-  L.test("ptr_pointer.lua")
-
-  L.bindFunction("range"):
-    trangA
-    trangB
-    trangC -> "haha"
-    trangC
-  L.test("range_param_ret.lua")
-
-  var test = 1237
-  proc cl(): string =
-    echo test
-    result = $test
-
-  L.bindFunction("wow"):
-    [cl]
-    [cl] -> "clever"
-    mew[int, int]
-    mew[int, string] -> "mewt"
-    opa
-
-  L.test("generic.lua")
-  L.test("closure.lua")
-  L.test("openarray.lua")
-
-  L.bindObject(Foos):
-    newFoos
-    getName
-    name(get,set)
-
-  L.bindObject(Ship):
-    newShip
-    speed(set)
-    speed(get, set) -> "cepat"
-    engine(set)
-    power(get)
-
-  L.test("getter_setter.lua")
-
-  L.bindFunction("tup"):
-    dino
-    saurus
-    croco
-    dile
-
-  L.test("tuple.lua")
-
-  L.bindObject(Avocado):
-    newAvocado -> "new"
-    name(get)
-    id(get)
-    getId
-
-  L.bindObject(Pineapple):
-    initPineapple -> "init"
-    name(get)
-    id(get)
-    getId
-    getAvocado
-
-  L.test("inheritance.lua")
-
-  L.testFromLua()
+    #programme
+  nimLuaOptions(nloDebug, false)
+  
+  #L.bindConst:
+  #  MANGOES -> "MANGGA"
+  #  PAPAYA -> "PEPAYA"
+  #  LEMON -> "JERUK"
+  #
+  #L.bindConst("buah"):
+  #  MANGOES -> "MANGGA"
+  #  PAPAYA -> "PEPAYA"
+  #  LEMON -> "JERUK"
+  #L.test("constants.lua")
+  
+  #L.bindEnum(GENE)
+  #L.test("single_scoped_enum.lua")
+  #
+  #L.bindEnum(GENE -> "DNA", ATOM -> GLOBAL, FRUIT)
+  #L.test("scoped_and_global_enum.lua")
+  #
+  #L.bindEnum:
+  #  ATOM
+  #  GENE
+  #  FRUIT
+  #  `poncho`
+  #L.test("scoped_enum.lua")
+  #
+  #L.bindFunction(mulv, tpc, tpm -> "goodMan")
+  #L.test("free_function.lua")
+  #
+  #L.bindFunction("gum"):
+  #  mulv
+  #  tpc
+  #  tpm -> "goodMan"
+  #  `++`
+  #L.test("scoped_function.lua")
+  #
+  #L.bindObject(Foo):
+  #  newFoo -> constructor
+  #  addv
+  #  addk -> "add"
+  #  setAcid2
+  #  setAcid
+  #  newFoo
+  #  newFoo -> "whatever"
+  #L.test("fun.lua")
+  #
+  #L.bindFunction("mac"):
+  #  machine
+  #L.test("ov_func.lua")
+  #
+  #L.bindObject(Acid):
+  #  makeAcid -> constructor
+  #  setLen
+  #  getLen
+  #
+  #L.bindFunction("acd"):
+  #  makeAcid
+  #
+  #L.bindFunction(makeAcid)
+  #L.bindObject(Fish):
+  #  fishing -> constructor
+  #
+  #L.bindObject(Fish):
+  #  grill
+  #  fry
+  #
+  #L.bindFunction("gem", mining)
+  #L.bindFunction("gem", polish)
+  #L.bindConst("gem", ANODE)
+  #
+  #L.bindObject(Fish -> "kakap"):
+  #  grill
+  #  fry
+  #L.test("regular_object.lua")
+  #
+  #L.bindFunction(GLOBAL):
+  #  mulv
+  #
+  #L.bindFunction("GLOBAL", mulv, subb)
+  #
+  #L.bindConst(GLOBAL):
+  #  LEMON
+  #
+  #L.bindConst("GLOBAL"):
+  #  LEMON
+  #
+  #L.bindEnum:
+  #  GENE -> GLOBAL
+  #  FRUIT -> "GLOBAL"
+  #L.test("namespace.lua")
+  #
+  #L.bindFunction("arr"):
+  #  chemA
+  #  geneA
+  #  fruitA
+  #  geneB
+  #  geneC
+  #  fruitC
+  #  chemC
+  #L.test("array_param_ret.lua")
+  #
+  #L.bindFunction("proto_banana"):
+  #  fruitE -> "radiate"
+  #L.test("enum_param_ret.lua")
+  #
+  #L.bindFunction("set"):
+  #  fruitS
+  #  alphaS
+  #  fruitSA
+  #  alphaSA
+  #L.test("set_param_ret.lua")
+  #
+  #L.bindFunction("seq"):
+  #  fruitQ
+  #  fruitQA
+  #  geneQ
+  #  geneQA
+  #  stringQ
+  #  stringQA
+  #  rootv
+  #L.test("sequence_param_ret.lua")
+  #
+  #L.bindFunction("ptr"):
+  #  seedP
+  #  geneP
+  #  genePA
+  #  intP
+  #  intPA
+  #  genePPA
+  #  intPPA
+  #  genePPB
+  #  intPPB
+  #L.test("ptr_pointer.lua")
+  #
+  #L.bindFunction("range"):
+  #  trangA
+  #  trangB
+  #  trangC -> "haha"
+  #  trangC
+  #L.test("range_param_ret.lua")
+  #
+  #var test = 1237
+  #proc cl(): string =
+  #  echo test
+  #  result = $test
+  #
+  #L.bindFunction("wow"):
+  #  [cl]
+  #  [cl] -> "clever"
+  #  mew[int, int]
+  #  mew[int, string] -> "mewt"
+  #  opa
+  #
+  #L.test("generic.lua")
+  #L.test("closure.lua")
+  #L.test("openarray.lua")
+  #
+  #L.bindObject(Foos):
+  #  newFoos
+  #  getName
+  #  name(get,set)
+  #
+  #L.bindObject(Ship):
+  #  newShip
+  #  speed(set)
+  #  speed(get, set) -> "cepat"
+  #  engine(set)
+  #  power(get)
+  #
+  #L.test("getter_setter.lua")
+  #
+  #L.bindFunction("tup"):
+  #  dino
+  #  saurus
+  #  croco
+  #  dile
+  #
+  #L.test("tuple.lua")
+  #
+  #L.bindObject(Avocado):
+  #  newAvocado -> "new"
+  #  name(get)
+  #  id(get)
+  #  getId
+  #
+  #L.bindObject(Pineapple):
+  #  initPineapple -> "init"
+  #  name(get)
+  #  id(get)
+  #  getId
+  #  getAvocado
+  #
+  #L.test("inheritance.lua")
+  #
+  #L.testFromLua()
   
   L.close()
 

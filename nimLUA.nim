@@ -544,11 +544,11 @@ proc proxyMixer*(ctx: proxyDesc, proxyName: string): NimNode {.compileTime.} =
 
   for n in ctx.bindList:
     if n.node.kind == nnkSym:
-      let im = getImpl(n.node.symbol)
+      let im = getImpl(n.node)
       collectSym(ids, im)
     else:
       for s in children(n.node):
-        let im = getImpl(s.symbol)
+        let im = getImpl(s)
         collectSym(ids, im)
 
   let macroName = "NLB$1$2" % [proxyName, $macroCount]
@@ -556,7 +556,7 @@ proc proxyMixer*(ctx: proxyDesc, proxyName: string): NimNode {.compileTime.} =
   nlb.add "  var ctx: proxyDesc\n"
   nlb.add "  ctx.luaCtx = \"$1\"\n" % [ctx.luaCtx]
   if ctx.subject.kind == nnkSym:
-    let subject = getImpl(ctx.subject.symbol)
+    let subject = getImpl(ctx.subject)
     if not checkObject(subject):
       error($ctx.subject & ": not an object")
     nlb.add "  ctx.subject = bindSym\"$1\"\n" % [$ctx.subject]
@@ -590,7 +590,7 @@ proc proxyMixer*(ctx: proxyDesc, proxyName: string): NimNode {.compileTime.} =
   if ctx.propList.len > 0:
     nlb.add "  ctx.propList = @[\n"
     var ii = 0
-    let subject = getImpl(ctx.subject.symbol)
+    let subject = getImpl(ctx.subject)
     for k in ctx.propList:
       if not checkProp(subject[2], k.node):
         error($ctx.subject & ": don't have properties " & k.name)
@@ -653,13 +653,13 @@ proc addOvProc(ovl: var ovList, retType: NimNode, params: seq[argDesc]) {.compil
     ovl.add newOvProc(retType, params)
 
 proc isRefType(s: NimNode): bool {.compileTime.} =
-  let n = getImpl(s.symbol)
+  let n = getImpl(s)
   if n.kind != nnkTypeDef: return false
   if n[2].kind != nnkRefTy: return false
   result = true
 
 proc isObjectType(s: NimNode): bool {.compileTime.} =
-  let n = getImpl(s.symbol)
+  let n = getImpl(s)
   if n.kind != nnkTypeDef: return false
   if n[2].kind != nnkObjectTy: return false
   result = true
@@ -719,7 +719,7 @@ proc addClosureEnv(SL, procName: string, n: NimNode, bd: bindDesc, ovIdx: int = 
   var glue = ""
 
   var params = copy(n[3])
-  params.add newIdentDefs(newIdentNode(toNimIdent("clEnv")), bindSym"pointer")
+  params.add newIdentDefs(newIdentNode("clEnv"), bindSym"pointer")
   let clv = params.toStrLit.strVal
 
   glue.add "type clsTyp$1$2 = proc$3 {.nimCall.}\n" % [$proxycount, $ovIdx, clv]
@@ -828,7 +828,7 @@ proc propsEnd*(L: PState) =
 # -------------------------------------------------------------------------
 
 proc bindEnumScoped(SL: string, s: NimNode, scopeName: string, kind: NimNodeKind): string {.compileTime.} =
-  let x = getImpl(s.symbol)
+  let x = getImpl(s)
   var err = false
   if x.kind != nnkTypeDef: err = true
   if x[0].kind != nnkSym: err = true
@@ -860,7 +860,7 @@ proc bindEnumScoped(SL: string, s: NimNode, scopeName: string, kind: NimNodeKind
   result = glue
 
 proc bindEnumGlobal(SL: string, s: NimNode, kind: NimNodeKind): string {.compileTime.} =
-  let x = getImpl(s.symbol)
+  let x = getImpl(s)
   var err = false
   if x.kind != nnkTypeDef: err = true
   if x[0].kind != nnkSym: err = true
@@ -1035,7 +1035,7 @@ proc constructArg(ctx: proxyDesc, mType: NimNode, i: int, procName: string, need
 
 proc argAttr(mType: NimNode): string {.compileTime.} =
   if mType.kind == nnkSym:
-    let nType = getImpl(mType.symbol)
+    let nType = getImpl(mType)
     if nType.kind == nnkTypeDef and nType[2].kind in {nnkObjectTy, nnkRefTy}:
       return ".ud"
 
@@ -1277,7 +1277,7 @@ proc genTupleArg(ctx: proxyDesc, nType: NimNode, i: int, procName: string): stri
 
 proc constructComplexArg(ctx: proxyDesc, mType: NimNode, i: int, procName: string, needCheck: var string): string {.compileTime.} =
   if mType.kind == nnkSym:
-    let nType = getImpl(mType.symbol)[2]
+    let nType = getImpl(mType)[2]
     if nType.kind in {nnkObjectTy, nnkRefTy}:
       needCheck = "if not $1.isNil:\n"
       return checkUD(registerObject(mType), $i)
@@ -1446,7 +1446,7 @@ proc genTupleRet(nType: NimNode, procCall, indent, procName: string): string {.c
 
 proc constructComplexRet(mType: NimNode, procCall, indent, procName: string): string {.compileTime.} =
   if mType.kind == nnkSym:
-    let nType = getImpl(mType.symbol)[2]
+    let nType = getImpl(mType)[2]
 
     if nType.kind == nnkBracketExpr:
       if $nType[0] == "array":
@@ -1645,7 +1645,7 @@ proc genCheckType(mType: NimNode, i: int, procName: string): string {.compileTim
 
 proc genComplexCheck(mType: NimNode, i: int, procName: string): string {.compileTime.} =
   if mType.kind == nnkSym:
-    let nType = getImpl(mType.symbol)[2]
+    let nType = getImpl(mType)[2]
     if nType.kind in {nnkObjectTy, nnkRefTy}:
       return "(L.isUserData(" & $i & ") == 1)"
 
@@ -1750,7 +1750,7 @@ proc bindOverloadedFunction(ctx: proxyDesc, bd: bindDesc, ov: NimNode, glueProc,
 
   var i = 0
   for s in children(ov):
-    let n = getImpl(s.symbol)
+    let n = getImpl(s)
     if n.kind != nnkProcDef:
       error("bindObject: " & procName & " is not a proc")
 
@@ -1793,7 +1793,7 @@ proc bindFunctionImpl*(ctx: proxyDesc): NimNode {.compileTime.} =
       exportedName = n.name
 
     if n.node.kind == nnkSym:
-      glue.add bindSingleFunction(ctx, n, getImpl(n.node.symbol), glueProc, procName, SL)
+      glue.add bindSingleFunction(ctx, n, getImpl(n.node), glueProc, procName, SL)
     else: #nnkClosedSymChoice
       glue.add bindOverloadedFunction(ctx, n, n.node, glueProc, procName, SL)
 
@@ -1843,7 +1843,6 @@ proc constructConstBasic(SL, name, indent: string, n: NimNode): string {.compile
   if n.kind in {nnkStrLit, nnkRStrLit, nnkTripleStrLit}:
     return indent & "discard $1.pushLString($2[i], $2[i].len)\n" % [SL, name]
 
-  echo "C: ", treeRepr(n)
   result = ""
 
 proc constructConstParBasic(SL, indent: string, n: NimNode, name: string, idx: int): string {.compileTime.} =
@@ -1860,7 +1859,6 @@ proc constructConstParBasic(SL, indent: string, n: NimNode, name: string, idx: i
   if n.kind in {nnkStrLit, nnkRStrLit, nnkTripleStrLit}:
     return indent & "discard $1.pushLString($2[i][$3], $2[i][$3].len)\n" % [SL, name, $idx]
 
-  echo "B: ", treeRepr(n)
   result = ""
 
 proc constructConstPar(SL, name, indent: string, n: NimNode): string {.compileTime.} =
@@ -1896,7 +1894,6 @@ proc constructConst(SL: string, n: NimNode, name: string): string {.compileTime.
         nlb.add "  $1.setTable(-3)\n" % [SL]
         return nlb
 
-  echo "A: ", treeRepr(n)
   result = ""
 
 proc bindConstImpl*(ctx: proxyDesc): NimNode {.compileTime.} =
@@ -1920,10 +1917,10 @@ proc bindConstImpl*(ctx: proxyDesc): NimNode {.compileTime.} =
 
     if exportLib:
       glue.add "discard " & SL & ".pushString(\"" & exportedName & "\")\n"
-      glue.add constructConst(SL, getImpl(n.node.symbol), $n.node)
+      glue.add constructConst(SL, getImpl(n.node), $n.node)
       glue.add SL & ".setTable(-3)\n"
     else:
-      glue.add constructConst(SL, getImpl(n.node.symbol), $n.node)
+      glue.add constructConst(SL, getImpl(n.node), $n.node)
       glue.add SL & ".setGlobal(\"" & exportedName & "\")\n"
 
   if exportLib:
@@ -1980,7 +1977,7 @@ proc eqType(a, b: NimNode): bool {.compileTime.} =
 
 proc getParentName(n: NimNode, res: var seq[string]) =
   var prefix = ""
-  var a = getImpl(n.symbol)[2]
+  var a = getImpl(n)[2]
   if a.kind notin {nnkObjectTy, nnkRefTy}: return
   if a.kind == nnkRefTy:
     a = a[0]
@@ -2037,7 +2034,7 @@ proc bindOverloadedConstructor(ctx: proxyDesc, bd: bindDesc, ov: NimNode, gluePr
   var i = 0
 
   for s in children(ov):
-    let n = getImpl(s.symbol)
+    let n = getImpl(s)
     if n.kind != nnkProcDef:
       error("bindObject: " & procName & " is not a proc")
 
@@ -2108,7 +2105,7 @@ proc bindObjectOverloadedMethod(ctx: proxyDesc, bd: bindDesc, ov: NimNode, glueP
   var i = 0
 
   for s in children(ov):
-    let n = getImpl(s.symbol)
+    let n = getImpl(s)
     if n.kind notin {nnkProcDef, nnkTemplateDef}:
       error("bindConstructor: " & procName & " is not a proc/template")
 
@@ -2213,9 +2210,9 @@ proc bindObjectImpl*(ctx: proxyDesc): NimNode {.compileTime.} =
 
     if n.node.kind == nnkSym:
       if n.name == "constructor" and n.lhsKind != nnkStrLit:
-        glue.add bindSingleConstructor(ctx, n, getImpl(n.node.symbol), glueProc, procName, subjectName)
+        glue.add bindSingleConstructor(ctx, n, getImpl(n.node), glueProc, procName, subjectName)
       else:
-        glue.add bindObjectSingleMethod(ctx, n, getImpl(n.node.symbol), glueProc, procName, subjectName)
+        glue.add bindObjectSingleMethod(ctx, n, getImpl(n.node), glueProc, procName, subjectName)
     else: #nnkClosedSymChoice
       if n.name == "constructor" and n.lhsKind != nnkStrLit:
         glue.add bindOverloadedConstructor(ctx, n, n.node, glueProc, procName, subjectName)
@@ -2230,7 +2227,7 @@ proc bindObjectImpl*(ctx: proxyDesc): NimNode {.compileTime.} =
         propName   = getAccQuotedName(n.node, n.lhsKind)
         getterProc = "nimLUAgetter" & $proxyCount
         setterProc = "nimLUAsetter" & $proxyCount
-        subjectT   = getImpl(subject.symbol)
+        subjectT   = getImpl(subject)
         propType   = getPropType(subjectT[2], propName)
 
       if propType == nil:
