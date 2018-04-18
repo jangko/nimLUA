@@ -301,7 +301,7 @@ proc unwindList(arg: NimNode, elemList: var seq[bindDesc], opts: bindFlags, prox
       let elem = newBindDesc(n[1], "__gc", n.kind, nnkNone, isDestructor)
       elemList.add elem
     else:
-      error("wrong param type: \n" & n.treeRepr, n)
+      error("wrong param type: $1, $2 not allowed here" % [$n.kind, n.toStrLit().strVal], n)
 
 proc checkDuplicate(list: seq[bindDesc]): string {.compileTime.} =
   var checked = newSeq[bindDesc]()
@@ -341,7 +341,8 @@ proc genProxyMacro(arg: NimNode, opts: bindFlags, proxyName: string): NimNode {.
         libName = n.strVal
         libKind = n.kind
       else:
-        error("param " & $i & " must be an identifier, not string literal\n" & toStrLit(callSite()).treeRepr)
+        let msg = "bind$1, param: $2" % [proxyName, n.toStrLit().strVal]
+        error("param " & $i & " must be an identifier, not string literal\n" & msg, n)
     of nnkIdent:
       if i == 1 and $n == "GLOBAL" and useLib:
         libName = $n
@@ -831,15 +832,22 @@ proc bindEnumScoped(SL: string, s: NimNode, scopeName: string, kind: NimNodeKind
   let x = getImpl(s)
   var err = false
   if x.kind != nnkTypeDef: err = true
-  if x[0].kind != nnkSym: err = true
+  if x[0].kind notin {nnkSym, nnkPragmaExpr}: err = true
   if x[2].kind != nnkEnumTy: err = true
-  if err:
-    error("bindEnum: incorrect enum definition")
+  if err: error("bindEnum: incorrect enum definition")
 
-  let
-    numEnum = x[2].len - 1
+  var pureEnum = false
+  var enumName = ""
+  if x[0].kind == nnkPragmaExpr:
+    pureEnum = $x[0][1][0] == "pure"
+  
+  if pureEnum:
+    if x[0][0].kind != nnkSym: error("wrong enum definition")
+    enumName = if kind == nnkAccQuoted: "`" & $x[0][0] & "`" else: $x[0][0]
+  else:
     enumName = if kind == nnkAccQuoted: "`" & $x[0] & "`" else: $x[0]
-
+    
+  let numEnum = x[2].len - 1    
   var glue = ""
   glue.add "$1.getGlobal(\"readonlytable\")\n" % [SL]
   glue.add addMemberCap(SL, scopeName, numEnum)
@@ -849,10 +857,8 @@ proc bindEnumScoped(SL: string, s: NimNode, scopeName: string, kind: NimNodeKind
       n = x[2][i]
       sym = if n.kind == nnkAccQuoted: "`" & $n[0] & "`" else: $n
     glue.add "discard $1.pushLString(\"$2\", $3)\n" % [SL, sym, $sym.len]
-    glue.add "when compiles($1):\n" % [sym]
-    glue.add "  $1.pushInteger(lua_Integer($2))\n" % [SL, sym]
-    glue.add "else:\n"
-    glue.add "  $1.pushInteger(lua_Integer($2.$3))\n" % [SL, enumName, sym]
+    if pureEnum: glue.add "$1.pushInteger(lua_Integer($2.$3))\n" % [SL, enumName, sym]    
+    else: glue.add "$1.pushInteger(lua_Integer($2))\n" % [SL, sym]
     glue.add "$1.setTable(-3)\n" % [SL]
 
   glue.add "discard $1.pcall(1, 1, 0)\n" % [SL]
@@ -863,24 +869,29 @@ proc bindEnumGlobal(SL: string, s: NimNode, kind: NimNodeKind): string {.compile
   let x = getImpl(s)
   var err = false
   if x.kind != nnkTypeDef: err = true
-  if x[0].kind != nnkSym: err = true
+  if x[0].kind notin {nnkSym, nnkPragmaExpr}: err = true
   if x[2].kind != nnkEnumTy: err = true
-  if err:
-    error("bindEnum: incorrect enum definition")
+  if err: error("bindEnum: incorrect enum definition")
 
-  let
-    numEnum = x[2].len - 1
+  var pureEnum = false
+  var enumName = ""
+  if x[0].kind == nnkPragmaExpr:
+    pureEnum = $x[0][1][0] == "pure"
+  
+  if pureEnum:
+    if x[0][0].kind != nnkSym: error("wrong enum definition")
+    enumName = if kind == nnkAccQuoted: "`" & $x[0][0] & "`" else: $x[0][0]
+  else:
     enumName = if kind == nnkAccQuoted: "`" & $x[0] & "`" else: $x[0]
-
+  
+  let numEnum = x[2].len - 1
   var glue = ""
   for i in 1..numEnum:
     let
       n = x[2][i]
       sym = if n.kind == nnkAccQuoted: "`" & $n[0] & "`" else: $n
-    glue.add "when compiles($1):\n" % [sym]
-    glue.add "  $1.pushInteger(lua_Integer($2))\n" % [SL, sym]
-    glue.add "else:\n"
-    glue.add "  $1.pushInteger(lua_Integer($2.$3))\n" % [SL, enumName, sym]
+    if pureEnum: glue.add "$1.pushInteger(lua_Integer($2.$3))\n" % [SL, enumName, sym]    
+    else: glue.add "$1.pushInteger(lua_Integer($2))\n" % [SL, sym]
     glue.add "$1.setGlobal(\"$2\")\n" % [SL, sym]
 
   result = glue
@@ -1040,7 +1051,10 @@ proc argAttr(mType: NimNode): string {.compileTime.} =
       return ".ud"
 
     if nType.kind == nnkTypeDef and nType[2].kind in {nnkDistinctTy, nnkEnumTy}:
-      return "." & $nType[0]
+      if nType[0].kind == nnkPragmaExpr:
+        return "." & $nType[0][0]
+      else: #nnkSym
+        return "." & $nType[0]
 
   if mType.kind == nnkVarTy:
     if getType(mType[0]).kind in {nnkObjectTy, nnkRefTy}:
@@ -1886,7 +1900,7 @@ proc constructConst(SL: string, n: NimNode, name: string): string {.compileTime.
       nlb.add constructConstBasic(SL, name, "  ", n[0])
       nlb.add "  $1.rawSeti(-2, i)\n" % [SL]
       return nlb
-    elif n[0].kind in {nnkPar}:
+    elif n[0].kind in {nnkPar, nnkTupleConstr}:
       if n[0].len == 2:
         var nlb = "$1.createTable(0, $2)\n" % [SL, $n.len]
         nlb.add "for i in 0..$1:\n" % [$(n.len-1)]
@@ -1913,7 +1927,6 @@ proc bindConstImpl*(ctx: proxyDesc): NimNode {.compileTime.} =
     if n.node.kind != nnkSym:
       error("bindConst: arg[" & $i & "] need symbol not " & $n.node.kind)
 
-    echo getImpl(n.node).treeRepr
     let exportedName = n.name
 
     if exportLib:
