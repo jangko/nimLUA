@@ -338,12 +338,12 @@ proc testFromLua(L: PState) =
   proc newLayout(): Layout =
     new(result)
     result.name = "The Layout"
-    
+
   L.bindObject(Layout):
     name(get)
 
   var lay = newLayout()
-  
+
   # store Layout reference
   L.pushLightUserData(cast[pointer](NLMaxID)) # push key
   L.pushLightUserData(cast[pointer](lay)) # push value
@@ -365,8 +365,8 @@ proc testFromLua(L: PState) =
     return 1
 
   L.pushCfunction(layoutProxy)
-  L.setGlobal("getLayout")  
-    
+  L.setGlobal("getLayout")
+
   #[L.getGlobal("View")     # get View table
   discard L.pushString("onClick") # push the key "onClick"
   L.rawGet(-2)            # get the function
@@ -380,7 +380,7 @@ proc testFromLua(L: PState) =
       L.pop(1)
       lay.context.otherError(errLua, errorMsg)
   L.pop(1) # pop View Table]#
-    
+
 proc main() =
   var L = newNimLua()
 
@@ -576,7 +576,6 @@ proc main() =
     speed(get, set) -> "cepat"
     engine(set)
     power(get)
-
   L.test("getter_setter.lua")
 
   L.bindFunction("tup"):
@@ -584,7 +583,6 @@ proc main() =
     saurus
     croco
     dile
-
   L.test("tuple.lua")
 
   L.bindObject(Avocado):
@@ -599,11 +597,9 @@ proc main() =
     id(get)
     getId
     getAvocado
-
   L.test("inheritance.lua")
 
   L.testFromLua()
-  
   L.close()
 
 main()
