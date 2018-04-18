@@ -472,9 +472,9 @@ proc genProxyMacro(arg: NimNode, opts: bindFlags, proxyName: string): NimNode {.
   if libKind == nnkStrLit:
     nlb.add "  ctx.libName = newStrLitNode(\"$1\")\n" % [libName]
   elif libKind == nnkIdent:
-    nlb.add "  ctx.libName = newIdentNode(toNimIdent(\"$1\"))\n" % [libName]
+    nlb.add "  ctx.libName = newIdentNode(\"$1\")\n" % [libName]
   elif registerObject:
-    nlb.add "  ctx.libName = newIdentNode(toNimIdent(\"$1\"))\n" % [objectNewName]
+    nlb.add "  ctx.libName = newIdentNode(\"$1\")\n" % [objectNewName]
   else:
     nlb.add "  ctx.libName = newEmptyNode()\n"
 
@@ -616,7 +616,7 @@ proc proxyMixer*(ctx: proxyDesc, proxyName: string): NimNode {.compileTime.} =
   if ctx.libName.kind == nnkStrLit:
     nlb.add "  ctx.libName = newStrLitNode(\"$1\")\n" % [$ctx.libName]
   elif ctx.libName.kind == nnkIdent:
-    nlb.add "  ctx.libName = newIdentNode(toNimIdent(\"$1\"))\n" % [$ctx.libName]
+    nlb.add "  ctx.libName = newIdentNode(\"$1\")\n" % [$ctx.libName]
   else:
     nlb.add "  ctx.libName = newEmptyNode()\n"
 
@@ -1913,6 +1913,7 @@ proc bindConstImpl*(ctx: proxyDesc): NimNode {.compileTime.} =
     if n.node.kind != nnkSym:
       error("bindConst: arg[" & $i & "] need symbol not " & $n.node.kind)
 
+    echo getImpl(n.node).treeRepr
     let exportedName = n.name
 
     if exportLib:
