@@ -840,14 +840,14 @@ proc bindEnumScoped(SL: string, s: NimNode, scopeName: string, kind: NimNodeKind
   var enumName = ""
   if x[0].kind == nnkPragmaExpr:
     pureEnum = $x[0][1][0] == "pure"
-  
+
   if pureEnum:
     if x[0][0].kind != nnkSym: error("wrong enum definition")
     enumName = if kind == nnkAccQuoted: "`" & $x[0][0] & "`" else: $x[0][0]
   else:
     enumName = if kind == nnkAccQuoted: "`" & $x[0] & "`" else: $x[0]
-    
-  let numEnum = x[2].len - 1    
+
+  let numEnum = x[2].len - 1
   var glue = ""
   glue.add "$1.getGlobal(\"readonlytable\")\n" % [SL]
   glue.add addMemberCap(SL, scopeName, numEnum)
@@ -857,7 +857,7 @@ proc bindEnumScoped(SL: string, s: NimNode, scopeName: string, kind: NimNodeKind
       n = x[2][i]
       sym = if n.kind == nnkAccQuoted: "`" & $n[0] & "`" else: $n
     glue.add "discard $1.pushLString(\"$2\", $3)\n" % [SL, sym, $sym.len]
-    if pureEnum: glue.add "$1.pushInteger(lua_Integer($2.$3))\n" % [SL, enumName, sym]    
+    if pureEnum: glue.add "$1.pushInteger(lua_Integer($2.$3))\n" % [SL, enumName, sym]
     else: glue.add "$1.pushInteger(lua_Integer($2))\n" % [SL, sym]
     glue.add "$1.setTable(-3)\n" % [SL]
 
@@ -877,20 +877,20 @@ proc bindEnumGlobal(SL: string, s: NimNode, kind: NimNodeKind): string {.compile
   var enumName = ""
   if x[0].kind == nnkPragmaExpr:
     pureEnum = $x[0][1][0] == "pure"
-  
+
   if pureEnum:
     if x[0][0].kind != nnkSym: error("wrong enum definition")
     enumName = if kind == nnkAccQuoted: "`" & $x[0][0] & "`" else: $x[0][0]
   else:
     enumName = if kind == nnkAccQuoted: "`" & $x[0] & "`" else: $x[0]
-  
+
   let numEnum = x[2].len - 1
   var glue = ""
   for i in 1..numEnum:
     let
       n = x[2][i]
       sym = if n.kind == nnkAccQuoted: "`" & $n[0] & "`" else: $n
-    if pureEnum: glue.add "$1.pushInteger(lua_Integer($2.$3))\n" % [SL, enumName, sym]    
+    if pureEnum: glue.add "$1.pushInteger(lua_Integer($2.$3))\n" % [SL, enumName, sym]
     else: glue.add "$1.pushInteger(lua_Integer($2))\n" % [SL, sym]
     glue.add "$1.setGlobal(\"$2\")\n" % [SL, sym]
 
@@ -1276,9 +1276,9 @@ proc registerTupleCheck(ctx: proxyDesc, nType: NimNode, procName: string): strin
         error(procName & ": unknown tuple param type: " & $x.mType.kind & "\n" & x.mType.treeRepr)
       if needCheck.len != 0:
         glue.add(("    " & needCheck) % [res])
-        glue.add "    result.$1 = $2"  % [$x.mName, res]
+        glue.add "    result.$1 = $2" % [$x.mName, res]
       else:
-        glue.add "  result.$1 = $2"  % [$x.mName, res]
+        glue.add "  result.$1 = $2" % [$x.mName, res]
     glue.add "  L.pop($1)\n" % [$argList.len]
     gContext.add glue
 
