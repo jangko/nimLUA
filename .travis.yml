@@ -34,12 +34,12 @@ install:
       }"
   - "export PATH=$PWD/nim/$NIMVER/bin:$PATH"
 
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then wget -q "https://sourceforge.net/projects/luabinaries/files/5.3.4/Linux%20Libraries/lua-5.3.4_Linux44_64_lib.tar.gz/download" fi
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then tar xfz lua-5.3.4_Linux44_64_lib.tar.gz fi
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then mv liblua53.so ./test/ fi
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then wget -q "https://sourceforge.net/projects/luabinaries/files/5.3.4/Other%20Libraries/lua-5.3.4_MacOS1011_lib.tar.gz/download" fi
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then tar xfz lua-5.3.4_MacOS1011_lib.tar.gz fi
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then mv liblua53.dylib ./test/ fi
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then wget -q "https://sourceforge.net/projects/luabinaries/files/5.3.4/Linux%20Libraries/lua-5.3.4_Linux44_64_lib.tar.gz/download"; fi
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then tar xfz lua-5.3.4_Linux44_64_lib.tar.gz; fi
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then mv liblua53.so ./test/; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then wget -q "https://sourceforge.net/projects/luabinaries/files/5.3.4/Other%20Libraries/lua-5.3.4_MacOS1011_lib.tar.gz/download"; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then tar xfz lua-5.3.4_MacOS1011_lib.tar.gz; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then mv liblua53.dylib ./test/; fi
   - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/test/
 
 script:
