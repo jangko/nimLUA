@@ -79,7 +79,7 @@ install:
     )
 
   - appveyor DownloadFile "https://www.lua.org/ftp/lua-5.3.5.tar.gz"
-  - 7z x -y lua-5.3.5.tar.gz > nul
+  - 7z x -y lua-5.3.5.tar.gz
   - ren lua-5.3.5 lua
   - nim e scripts/build.nims
 
