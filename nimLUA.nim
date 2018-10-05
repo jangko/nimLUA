@@ -24,7 +24,7 @@
 #
 #-------------------------------------
 
-import macros, nimLua/lua, strutils
+import macros, nimLUA/lua, strutils
 export lua, macros
 
 type
