@@ -51,10 +51,10 @@ install:
 
 script:
   - nimble install -y > /dev/null
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; nimble test; fi
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then nimble test; fi
   # OSX DYLD_LIBRARY_PATH not available in subprocess env
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; nim c -d:nimDebugDlOpen test/test; fi
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; test/test; fi
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; nim c -d:nimDebugDlOpen -d:release test/test; fi
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; test/test; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then nim c -d:nimDebugDlOpen test/test; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then test/test; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then nim c -d:nimDebugDlOpen -d:release test/test; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then test/test; fi
 
