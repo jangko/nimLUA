@@ -21,10 +21,10 @@ const
 when not defined(useLuaJIT):
   when defined(MACOSX):
     const
-      LIB_NAME* = "liblua5.3.dylib"
+      LIB_NAME* = "liblua53.dylib"
   elif defined(UNIX):
     const
-      LIB_NAME* = "liblua(5.3.so|.so.5.3)"
+      LIB_NAME* = "liblua53.so"
   else:
     const
       LIB_NAME* = "lua53.dll"
