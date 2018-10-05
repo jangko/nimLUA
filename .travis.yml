@@ -35,10 +35,10 @@ install:
   - "export PATH=$PWD/nim/$NIMVER/bin:$PATH"
 
   - wget -q https://www.lua.org/ftp/lua-5.3.5.tar.gz
-  - mkdir lua
-  - tar xfz lua-5.3.5.tar.gz --directory lua
+  - tar xfz lua-5.3.5.tar.gz
+  - mv lua-5.3.5 lua
   - nim e scripts/build.nims
-  
+
 script:
   - nimble install -y > /dev/null
   - nimble test
