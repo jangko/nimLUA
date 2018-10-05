@@ -21,20 +21,13 @@ else:
 type
   FileName = tuple[dir, name, ext: string]
 
-const core = ["lapi", "lcode", "lctype", "ldebug", "ldo", "ldump",
-  "lfunc", "lgc", "llex", "lmem", "lobject", "lopcodes", "lparser",
-  "lstate", "lstring", "ltable", "ltm", "lundump", "lvm", "lzio", "lauxlib"]
-
-proc isCore(name: string): bool =
-  for c in core:
-    if cmpIgnoreCase(name, c) == 0: return true
-
 proc getCFiles(dir: string): seq[FileName] =
   var files = listFiles(dir)
   result = @[]
   for c in files:
     let x = c.splitFile
-    if not isCore(x.name): continue
+    if cmpIgnoreCase(x.name, "lua") == 0: continue
+    if cmpIgnoreCase(x.name, "luac") == 0: continue
     if cmpIgnoreCase(x.ext, ".c") == 0:
       result.add x
 
