@@ -64,7 +64,7 @@ proc test(L: PState, fileName: string) =
   if L.doFile("test" & DirSep & fileName) != 0.cint:
     echo L.toString(-1)
     L.pop(1)
-    quit()
+    quit(-1)
   else:
     echo fileName & " .. OK"
 

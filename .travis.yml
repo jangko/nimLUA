@@ -1,0 +1,61 @@
+language: c # or other C/C++ variants
+
+sudo: false
+
+# https://docs.travis-ci.com/user/caching/
+#
+# Caching the whole nim folder is better than relying on ccache - this way, we
+# skip the expensive bootstrap process and linking
+cache:
+  directories:
+    - nim
+
+matrix:
+  include:
+    - os: linux
+      env:
+        - LUA_URL=https://netix.dl.sourceforge.net/project/luabinaries/5.3.4/Linux%20Libraries/lua-5.3.4_Linux44_64_lib.tar.gz
+        - LUA_ARC=lua-5.3.4_Linux44_64_lib.tar.gz
+        - LUA_SO=liblua53.so
+    - os: osx
+      env:
+        - LUA_URL=https://nchc.dl.sourceforge.net/project/luabinaries/5.3.4/Other%20Libraries/lua-5.3.4_MacOS1011_lib.tar.gz
+        - LUA_ARC=lua-5.3.4_MacOS1011_lib.tar.gz
+        - LUA_SO=liblua53.dylib
+
+install:
+  - "wget -q $LUA_URL"
+  - "tar xfz $LUA_ARC"
+  - "mv $LUA_SO ./test/"
+  - "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/test/"
+  - "export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:$(pwd)/test/"
+
+  # build nim from our own branch - this to avoid the day-to-day churn and
+  # regressions of the fast-paced Nim development while maintaining the
+  # flexibility to apply patches
+  #
+  # check version of remote branch
+  - "export NIMVER=$(git ls-remote https://github.com/nim-lang/nim.git HEAD | cut -f 1)"
+
+  # after building nim, wipe csources to save on cache space
+  - "{ [ -f nim/$NIMVER/bin/nim ] && [ -f nim/$NIMVER/bin/nimble ] ; } ||
+      { rm -rf nim ;
+        mkdir -p nim ;
+        git clone --depth=1 https://github.com/nim-lang/nim.git nim/$NIMVER ;
+        cd nim/$NIMVER ;
+        sh build_all.sh > /dev/null;
+        rm -rf csources ;
+        cd ../.. ;
+      }"
+  - "export PATH=$PWD/nim/$NIMVER/bin:$PATH"
+
+script:
+  - nimble install -y > /dev/null
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then nimble test; fi
+  # OSX DYLD_LIBRARY_PATH not available in subprocess env
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then nim c -d:nimDebugDlOpen test/test; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then test/test; fi
+  # OSX release build still failed when bind object
+  #- if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then nim c -d:nimDebugDlOpen -d:release test/test; fi
+  #- if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then test/test; fi
+

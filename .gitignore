@@ -2,3 +2,6 @@ nimcache/
 nimPDF/
 bug/
 *.exe
+*.dll
+lua/
+master/
