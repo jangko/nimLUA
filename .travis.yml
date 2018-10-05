@@ -34,11 +34,12 @@ install:
       }"
   - "export PATH=$PWD/nim/$NIMVER/bin:$PATH"
 
-  - wget -q https://www.lua.org/ftp/lua-5.3.5.tar.gz
-  - tar xfz lua-5.3.5.tar.gz
-  - mv lua-5.3.5 lua
-  - nim e scripts/build.nims
-
-script:
-  - nimble install -y > /dev/null
-  - nimble test
+#  - wget -q https://www.lua.org/ftp/lua-5.3.5.tar.gz
+#  - tar xfz lua-5.3.5.tar.gz
+#  - mv lua-5.3.5 lua
+#  - nim e scripts/build.nims
+#  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/test/ fi
+#  
+#script:
+#  - nimble install -y > /dev/null
+#  - nimble test
