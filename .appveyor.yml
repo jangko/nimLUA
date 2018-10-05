@@ -80,7 +80,7 @@ build_script:
 test_script:
   - nim e scripts/build.nims
   - nimble test
-  - nim e -d:build32 scripts/build.nims
-  - nimble test32
+  #- nim e -d:build32 scripts/build.nims
+  #- nimble test32
 
 deploy: off

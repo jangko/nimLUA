@@ -14,18 +14,21 @@ matrix:
   include:
     - os: linux
       env:
-        global:
-          - LUA_URL=https://netix.dl.sourceforge.net/project/luabinaries/5.3.4/Linux%20Libraries/lua-5.3.4_Linux44_64_lib.tar.gz
-          - LUA_ARC=lua-5.3.4_Linux44_64_lib.tar.gz
-          - LUA_SO=liblua53.so
+        - LUA_URL=https://netix.dl.sourceforge.net/project/luabinaries/5.3.4/Linux%20Libraries/lua-5.3.4_Linux44_64_lib.tar.gz
+        - LUA_ARC=lua-5.3.4_Linux44_64_lib.tar.gz
+        - LUA_SO=liblua53.so
     - os: osx
       env:
-        global:
-          - LUA_URL=https://nchc.dl.sourceforge.net/project/luabinaries/5.3.4/Other%20Libraries/lua-5.3.4_MacOS1011_lib.tar.gz
-          - LUA_ARC=lua-5.3.4_MacOS1011_lib.tar.gz
-          - LUA_SO=liblua53.dylib
+        - LUA_URL=https://nchc.dl.sourceforge.net/project/luabinaries/5.3.4/Other%20Libraries/lua-5.3.4_MacOS1011_lib.tar.gz
+        - LUA_ARC=lua-5.3.4_MacOS1011_lib.tar.gz
+        - LUA_SO=liblua53.dylib
 
 install:
+  - "wget -q $LUA_URL"
+  - "tar xfz $LUA_ARC"
+  - "mv $LUA_SO ./test/"
+  - "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/test/"
+  
   # build nim from our own branch - this to avoid the day-to-day churn and
   # regressions of the fast-paced Nim development while maintaining the
   # flexibility to apply patches
@@ -44,11 +47,6 @@ install:
         cd ../.. ;
       }"
   - "export PATH=$PWD/nim/$NIMVER/bin:$PATH"
-
-  - "wget -q $LUA_URL"
-  - "tar xfz $LUA_ARC"
-  - "mv $LUA_SO ./test/"
-  - "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/test/"
 
 script:
   - nimble install -y > /dev/null
