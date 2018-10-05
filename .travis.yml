@@ -41,10 +41,10 @@ install:
       }"
   - "export PATH=$PWD/nim/$NIMVER/bin:$PATH"
 
-  - wget -q $LUA_URL
-  - tar xfz $LUA_ARC
-  - mv $LUA_SO ./test/
-  - export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/test/
+  - "wget -q $LUA_URL"
+  - "tar xfz $LUA_ARC"
+  - "mv $LUA_SO ./test/"
+  - "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/test/"
 
 script:
   - nimble install -y > /dev/null
