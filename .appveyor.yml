@@ -2,7 +2,6 @@ version: '{build}'
 
 cache:
 - x86_64-4.9.2-release-win32-seh-rt_v4-rev4.7z -> .appveyor.yml
-- i686-4.9.2-release-win32-dwarf-rt_v4-rev4.7z -> .appveyor.yml
 - Nim -> .appveyor.yml
 
 matrix:
@@ -10,24 +9,15 @@ matrix:
   fast_finish: false
 
 platform:
-  - x86
   - x64
 
 install:
   - setlocal EnableExtensions EnableDelayedExpansion
 
-  - IF "%PLATFORM%" == "x86" (
-      SET "MINGW_ARCHIVE=i686-4.9.2-release-win32-dwarf-rt_v4-rev4.7z" &
-      SET "MINGW_URL=https://sourceforge.net/projects/mingw-w64/files/Toolchains%%20targetting%%20Win32/Personal%%20Builds/mingw-builds/4.9.2/threads-win32/dwarf/i686-4.9.2-release-win32-dwarf-rt_v4-rev4.7z" &
-      SET "MINGW_DIR=mingw32"
-    ) ELSE (
-      IF "%PLATFORM%" == "x64" (
-        SET "MINGW_ARCHIVE=x86_64-4.9.2-release-win32-seh-rt_v4-rev4.7z" &
-        SET "MINGW_URL=https://sourceforge.net/projects/mingw-w64/files/Toolchains%%20targetting%%20Win64/Personal%%20Builds/mingw-builds/4.9.2/threads-win32/seh/x86_64-4.9.2-release-win32-seh-rt_v4-rev4.7z" &
-        SET "MINGW_DIR=mingw64"
-      ) else (
-        echo "Unknown platform"
-      )
+  - IF "%PLATFORM%" == "x64" (
+      SET "MINGW_ARCHIVE=x86_64-4.9.2-release-win32-seh-rt_v4-rev4.7z" &
+      SET "MINGW_URL=https://sourceforge.net/projects/mingw-w64/files/Toolchains%%20targetting%%20Win64/Personal%%20Builds/mingw-builds/4.9.2/threads-win32/seh/x86_64-4.9.2-release-win32-seh-rt_v4-rev4.7z" &
+      SET "MINGW_DIR=mingw64"
     )
 
   - SET PATH=%CD%\%MINGW_DIR%\bin;%CD%\Nim\bin;%PATH%
@@ -82,13 +72,15 @@ install:
   - 7z e lua-5.3.5.tar.gz
   - 7z x lua-5.3.5.tar
   - ren lua-5.3.5 lua
-  - nim e scripts/build.nims
 
 build_script:
   - cd C:\projects\%APPVEYOR_PROJECT_SLUG%
   - nimble install -y > nul
 
 test_script:
+  - nim e scripts/build.nims
   - nimble test
+  - nim e -d:build32 scripts/build.nims
+  - nimble test32
 
 deploy: off

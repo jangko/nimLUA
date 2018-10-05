@@ -13,13 +13,17 @@ cache:
 matrix:
   include:
     - os: linux
-      env: LUA_URL=https://netix.dl.sourceforge.net/project/luabinaries/5.3.4/Linux%20Libraries/lua-5.3.4_Linux44_64_lib.tar.gz
-      env: LUA_ARC=lua-5.3.4_Linux44_64_lib.tar.gz
-      env: LUA_SO=liblua53.so
+      env:
+        global:
+          - LUA_URL=https://netix.dl.sourceforge.net/project/luabinaries/5.3.4/Linux%20Libraries/lua-5.3.4_Linux44_64_lib.tar.gz
+          - LUA_ARC=lua-5.3.4_Linux44_64_lib.tar.gz
+          - LUA_SO=liblua53.so
     - os: osx
-      env: LUA_URL=https://nchc.dl.sourceforge.net/project/luabinaries/5.3.4/Other%20Libraries/lua-5.3.4_MacOS1011_lib.tar.gz
-      env: LUA_ARC=lua-5.3.4_MacOS1011_lib.tar.gz
-      env: LUA_SO=liblua53.dylib
+      env:
+        global:
+          - LUA_URL=https://nchc.dl.sourceforge.net/project/luabinaries/5.3.4/Other%20Libraries/lua-5.3.4_MacOS1011_lib.tar.gz
+          - LUA_ARC=lua-5.3.4_MacOS1011_lib.tar.gz
+          - LUA_SO=liblua53.dylib
 
 install:
   # build nim from our own branch - this to avoid the day-to-day churn and

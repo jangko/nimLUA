@@ -6,8 +6,12 @@ when defined(unix):
     compatFlag = "-DLUA_COMPAT_ALL" # or "-DLUA_COMPAT_5_2"
     linkFlags = ""
 else:
+  when defined(build32):
+    const extraFlag = "-m32"
+  else:
+    const extraFlag = ""
+    
   const
-    extraFlag = "" #"-DLUA_BUILD_AS_DLL"
     compatFlag = "-DLUA_COMPAT_ALL" # or "-DLUA_COMPAT_5_2"
     linkFlags = ""
 
