@@ -35,6 +35,7 @@ install:
   - "export PATH=$PWD/nim/$NIMVER/bin:$PATH"
 
   - wget -q https://www.lua.org/ftp/lua-5.3.5.tar.gz
+  - mkdir lua
   - tar xfz lua-5.3.5.tar.gz --directory lua
   - nim e scripts/build.nims
   
