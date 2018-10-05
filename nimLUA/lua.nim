@@ -26,12 +26,8 @@ when not defined(useLuaJIT):
     const
       LIB_NAME* = "liblua(5.3.so|.so.5.3)"
   else:
-    when defined(cpu64):
-      const
-        LIB_NAME* = "lua53x64.dll"
-    else:
-      const
-        LIB_NAME* = "lua53.dll"
+    const
+      LIB_NAME* = "lua53.dll"
 else:
   when defined(MACOSX):
     const
