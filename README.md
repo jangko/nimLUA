@@ -470,3 +470,6 @@ nimLUA already provide a default error handler in case you forget to provide one
 ## **HOW TO ACCESS LUA CODE FROM NIM?**
 
 still under development, contributions are welcome
+
+## Installation via nimble
+> nimble install nimLUA
