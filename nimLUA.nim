@@ -106,6 +106,12 @@ const
   IDErrorFunc = IDRegion - 2
   NLMaxID* = 0xFFF
 
+template luaError*(x: PState, m: string): untyped =
+  lua.error(x, m)
+
+proc isStrictString*(L: PState, idx: int): bool {.inline.} =
+  luaType(L, idx.cint) == LUA_TSTRING.cint
+
 #counter that will be used to generate unique intermediate macro name
 #and avoid name collision
 var
@@ -921,7 +927,7 @@ macro bindEnum*(arg: varargs[untyped]): untyped =
 # these are runtime type check helper for each type
 # supported by Nim and Lua
 proc nimCheckString*(L: PState, idx: cint): string =
-  if L.isString(idx) != 0: result = L.toString(idx)
+  if L.isStrictString(idx): result = L.toString(idx)
   else:
     L.nimDebug(idx.cint, "string")
     result = ""
@@ -945,7 +951,7 @@ proc nimCheckNumber*(L: PState, idx: cint): float64 =
     result = 0.0
 
 proc nimCheckCstring*(L: PState, idx: cint): cstring =
-  if L.isString(idx) != 0: result = L.toLString(idx, nil)
+  if L.isStrictString(idx): result = L.toLString(idx, nil)
   else:
     L.nimDebug(idx.cint, "cstring")
     result = nil
@@ -1639,10 +1645,10 @@ proc genBasicCheck(mType: NimNode, i: int, procNane: string): string {.compileTi
       return "(L.isNumber(" & $i & ") == 1)"
 
   if argType == "string":
-    return "(L.isString(" & $i & ") == 1)"
+    return "(L.isStrictString(" & $i & ") == true)"
 
   if argType == "cstring":
-    return "(L.isString(" & $i & ") == 1)"
+    return "(L.isStrictString(" & $i & ") == true)"
 
   if argType == "bool":
     return "L.isBoolean(" & $i & ")"
@@ -1777,7 +1783,7 @@ proc bindOverloadedFunction(ctx: proxyDesc, bd: bindDesc, ov: NimNode, glueProc,
 
   glue.add "proc " & glueProc & "(L: PState): cint {.cdecl.} =\n"
   glue.add genOvCall(ctx, ovl, procName, {ovfUseRet}, bd)
-  glue.add "  discard L.error(\"$1: invalid param count\")\n" % [procName]
+  glue.add "  discard luaError(L, \"$1: invalid param count\")\n" % [procName]
   glue.add "  return 0\n"
 
   result = glue
@@ -2145,7 +2151,7 @@ proc bindObjectOverloadedMethod(ctx: proxyDesc, bd: bindDesc, ov: NimNode, glueP
   glue.add "  var proxy = " & checkUD(subjectName, "1")
   glue.add "  if proxy.isNil: return 0\n"
   glue.add genOvCall(ctx, ovl, procName, {ovfUseObject, ovfUseRet}, bd)
-  glue.add "  discard L.error(\"$1: invalid param count\")\n" % [procName]
+  glue.add "  discard luaError(L, \"$1: invalid param count\")\n" % [procName]
   glue.add "  return 0\n"
   result = glue
 

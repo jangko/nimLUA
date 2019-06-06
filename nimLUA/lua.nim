@@ -330,7 +330,7 @@ proc pushglobaltable*(L: PState) {.inline.} =
   L.rawgeti(LUA_REGISTRYINDEX, LUA_RIDX_GLOBALS)
 
 proc tostring*(L: PState; index: cint): string =
-  var len: cint = 0
+  var len: csize = 0
   var s = L.tolstring(index, addr(len))
   result = newString(len)
   copyMem(result.cstring, s, len)
@@ -476,7 +476,7 @@ proc open_package*(L: PState): cint {.iluaLIB.}
 proc openlibs*(L: PState) {.iluaL.}
 
 when not defined(lua_assert):
-  template lua_assert*(x: typed): typed =
+  template lua_assert*(x: typed) =
     (cast[nil](0))
 
 
@@ -580,7 +580,7 @@ proc dostring*(L: PState, s: string): cint {.inline, discardable.} =
 proc getmetatable*(L: PState, s: string) {.inline.} =
   L.getfield(LUA_REGISTRYINDEX, s)
 
-template opt*(L: PState, f: TCFunction, n, d: typed): typed =
+template opt*(L: PState, f: TCFunction, n, d: typed) =
   if L.isnoneornil(n): d else: L.f(n)
 
 proc loadbuffer*(L: PState, buff: string, name: string): cint =
