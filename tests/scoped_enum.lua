@@ -12,12 +12,22 @@ assert(FRUIT.BANANA == 1)
 assert(FRUIT.PEACH == 2)
 assert(FRUIT.PLUM == 3)
 
--- since nim 1.2.2 accquoted enum
+-- since nim 1.2.4 accquoted enum
 -- become ident
--- assert(_G["`poncho`"]["`glucho`"] == 0)
--- assert(_G["`poncho`"]["`becho`"] == 1)
--- assert(_G["`poncho`"]["`type`"] == 2)
 
-assert(_G["`poncho`"]["glucho"] == 0)
-assert(_G["`poncho`"]["becho"] == 1)
-assert(_G["`poncho`"]["type"] == 2)
+x = { major = 1, minor = 2, patch = 4 }
+
+function verValue(x)
+  return x.major * 100 + x.minor * 10 + x.patch
+end
+
+
+if verValue(Nim) < verValue(x) then
+  assert(_G["`poncho`"]["`glucho`"] == 0)
+  assert(_G["`poncho`"]["`becho`"] == 1)
+  assert(_G["`poncho`"]["`type`"] == 2)
+else
+  assert(_G["`poncho`"]["glucho"] == 0)
+  assert(_G["`poncho`"]["becho"] == 1)
+  assert(_G["`poncho`"]["type"] == 2)
+end
