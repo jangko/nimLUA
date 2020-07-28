@@ -11,7 +11,7 @@ type
     APPLE, BANANA, PEACH, PLUM
 
   `poncho` = enum
-    `glucho`, `becho`
+    `glucho`, `becho`, `type`
 
 const
   MANGOES = 10.0

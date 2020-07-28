@@ -109,6 +109,12 @@ const
 template luaError*(x: PState, m: string): untyped =
   lua.error(x, m)
 
+template newuserdata*(L: PState, sz: int): pointer =
+  newuserdata(L, sz.csize_t)
+
+template pushlstring*(L: PState, s: cstring, len: int): cstring =
+  pushlstring(L, s, len.csize_t)
+
 proc isStrictString*(L: PState, idx: int): bool {.inline.} =
   luaType(L, idx.cint) == LUA_TSTRING.cint
 

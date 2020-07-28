@@ -5,7 +5,7 @@ description   = "glue code generator to bind Nim and Lua together using Nim's po
 license       = "MIT"
 skipDirs      = @["test", "scripts"]
 
-requires: "nim >= 0.18.1"
+requires: "nim >= 1.2.2"
 
 task test, "Run all tests":
   exec "nim c -r -d:nimDebugDlOpen test/test"
