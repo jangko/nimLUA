@@ -10,7 +10,7 @@ else:
     const extraFlag = "-m32"
   else:
     const extraFlag = ""
-    
+
   const
     compatFlag = "-DLUA_COMPAT_ALL" # or "-DLUA_COMPAT_5_2"
     linkFlags = ""
@@ -55,6 +55,6 @@ for x in src:
     echo "failed to build ", fileName
 
 let objList = toString(objs)
-let linkCmd = "gcc -shared $4 -o $1$2$3 $5" % ["test", $DirSep, LIB_NAME, extraFlag, objList]
+let linkCmd = "gcc -shared $4 -o $1$2$3 $5" % ["tests", $DirSep, LIB_NAME, extraFlag, objList]
 echo linkCmd
 exec(linkCmd)
