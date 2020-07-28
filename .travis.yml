@@ -26,9 +26,9 @@ matrix:
 install:
   - "wget -q $LUA_URL"
   - "tar xfz $LUA_ARC"
-  - "mv $LUA_SO ./test/"
-  - "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/test/"
-  - "export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:$(pwd)/test/"
+  - "mv $LUA_SO ./tests/"
+  - "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/tests/"
+  - "export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:$(pwd)/tests/"
 
   # build nim from our own branch - this to avoid the day-to-day churn and
   # regressions of the fast-paced Nim development while maintaining the
