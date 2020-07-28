@@ -7,9 +7,9 @@ skipDirs      = @["test", "scripts"]
 
 requires: "nim >= 1.2.2"
 
-task test, "Run all tests":
-  exec "nim c -r -d:nimDebugDlOpen test/test"
-  exec "nim c -r -d:nimDebugDlOpen -d:release test/test"
-  exec "nim c -r -d:importLogging test/bug19"
-  exec "nim c -r -d:importLogging -d:release test/bug19"
+task tests, "Run all tests":
+  exec "nim c -r -d:nimDebugDlOpen tests/test_features"
+  exec "nim c -r -d:nimDebugDlOpen -d:release tests/test_features"
+  exec "nim c -r -d:importLogging tests/test_bug19"
+  exec "nim c -r -d:importLogging -d:release tests/test_bug19"
 

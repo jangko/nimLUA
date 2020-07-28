@@ -89,6 +89,6 @@ build_script:
 
 test_script:
   - nim e scripts/build.nims
-  - nimble test
+  - nimble tests
 
 deploy: off

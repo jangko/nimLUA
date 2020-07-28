@@ -61,7 +61,7 @@ proc rootv(u: float): seq[float] =
   for i in 0..9: result[i] = u * i.float
 
 proc test(L: PState, fileName: string) =
-  if L.doFile("test" & DirSep & fileName) != 0.cint:
+  if L.doFile("tests" / fileName) != 0.cint:
     echo L.toString(-1)
     L.pop(1)
     quit(-1)
