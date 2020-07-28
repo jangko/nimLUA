@@ -473,3 +473,11 @@ still under development, contributions are welcome
 
 ## Installation via nimble
 > nimble install nimLUA
+
+## Override shared library name
+
+You can use compiler switch `-d:SHARED_LIB_NAME="yourlibname"`
+
+```bash
+$> nim c -r -d:SHARED_LIB_NAME="lua534.dll" test/test
+```

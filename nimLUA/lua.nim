@@ -17,8 +17,11 @@ const
 #{.deadCodeElim: on.}
 #when defined(useLuaJIT):
 #  {.warning: "Lua JIT does not support Lua 5.3 at this time."}
+const SHARED_LIB_NAME* {.strdefine.} = "none"
 
-when not defined(useLuaJIT):
+when SHARED_LIB_NAME != "none":
+  const LIB_NAME* = SHARED_LIB_NAME
+elif not defined(useLuaJIT):
   when defined(MACOSX):
     const
       LIB_NAME* = "liblua53.dylib"
