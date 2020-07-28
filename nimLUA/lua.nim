@@ -17,8 +17,11 @@ const
 #{.deadCodeElim: on.}
 #when defined(useLuaJIT):
 #  {.warning: "Lua JIT does not support Lua 5.3 at this time."}
+const SHARED_LIB_NAME* {.strdefine.} = "none"
 
-when not defined(useLuaJIT):
+when SHARED_LIB_NAME != "none":
+  const LIB_NAME* = SHARED_LIB_NAME
+elif not defined(useLuaJIT):
   when defined(MACOSX):
     const
       LIB_NAME* = "liblua53.dylib"
@@ -88,11 +91,11 @@ type
   TCFunction* = proc (L: PState): cint{.cdecl.}
 
   #* functions that read/write blocks when loading/dumping Lua chunks
-  TReader* = proc (L: PState; ud: pointer; sz: var csize): cstring {.cdecl.}
-  TWriter* = proc (L: PState; p: pointer; sz: csize; ud: pointer): cint {.cdecl.}
+  TReader* = proc (L: PState; ud: pointer; sz: var csize_t): cstring {.cdecl.}
+  TWriter* = proc (L: PState; p: pointer; sz: csize_t; ud: pointer): cint {.cdecl.}
 
   #* prototype for memory-allocation functions
-  TAlloc* = proc (ud, p: pointer; osize, nsize: csize): pointer
+  TAlloc* = proc (ud, p: pointer; osize, nsize: csize_t): pointer
 
 #* basic types
 const
@@ -169,8 +172,8 @@ proc typename*(L: PState; tp: cint): cstring {.ilua.}
 proc tonumberx*(L: PState; idx: cint; isnum: ptr cint): lua_Number {.ilua.}
 proc tointegerx*(L: PState; idx: cint; isnum: ptr cint): lua_Integer {.ilua.}
 proc toboolean*(L: PState; idx: cint): cint {.ilua.}
-proc tolstring*(L: PState; idx: cint; len: ptr csize): cstring {.ilua.}
-proc rawlen*(L: PState; idx: cint): csize {.ilua.}
+proc tolstring*(L: PState; idx: cint; len: ptr csize_t): cstring {.ilua.}
+proc rawlen*(L: PState; idx: cint): csize_t {.ilua.}
 proc tocfunction*(L: PState; idx: cint): TCFunction {.ilua.}
 proc touserdata*(L: PState; idx: cint): pointer {.ilua.}
 proc tothread*(L: PState; idx: cint): PState {.ilua.}
@@ -202,7 +205,7 @@ proc compare*(L: PState; idx1: cint; idx2: cint; op: cint): cint {.ilua.}
 proc pushnil*(L: PState) {.ilua.}
 proc pushnumber*(L: PState; n: lua_Number) {.ilua.}
 proc pushinteger*(L: PState; n: lua_Integer) {.ilua.}
-proc pushlstring*(L: PState; s: cstring; len: csize): cstring {.ilua.}
+proc pushlstring*(L: PState; s: cstring; len: csize_t): cstring {.ilua.}
 proc pushstring*(L: PState; s: cstring): cstring {.ilua.}
 proc pushvfstring*(L: PState; fmt: cstring): cstring {.varargs,ilua.}
 proc pushfstring*(L: PState; fmt: cstring): cstring {.varargs,ilua.}
@@ -221,7 +224,7 @@ proc rawget*(L: PState; idx: cint) {.ilua.}
 proc rawgeti*(L: PState; idx: cint; n: cint) {.ilua.}
 proc rawgetp*(L: PState; idx: cint; p: pointer) {.ilua.}
 proc createtable*(L: PState; narr: cint; nrec: cint) {.ilua.}
-proc newuserdata*(L: PState; sz: csize): pointer {.ilua.}
+proc newuserdata*(L: PState; sz: csize_t): pointer {.ilua.}
 proc getmetatable*(L: PState; idx: cint): cint {.ilua.}
 proc getuservalue*(L: PState; idx: cint) {.ilua.}
 
@@ -324,16 +327,16 @@ proc isnoneornil*(L: PState; n: cint): bool {.inline.} =
   L.luatype(n) <= 0
 
 proc pushliteral*(L: PState, s: string): cstring {.inline, discardable.} =
-  L.pushlstring(s, s.len)
+  L.pushlstring(s, s.len.csize_t)
 
 proc pushglobaltable*(L: PState) {.inline.} =
   L.rawgeti(LUA_REGISTRYINDEX, LUA_RIDX_GLOBALS)
 
 proc tostring*(L: PState; index: cint): string =
-  var len: csize = 0
+  var len: csize_t = 0
   var s = L.tolstring(index, addr(len))
   result = newString(len)
-  copyMem(result.cstring, s, len)
+  copyMem(result.cstring, s, len.int)
 
 proc tobool*(L: PState; index: cint): bool =
   result = if L.toboolean(index) == 1: true else: false
@@ -499,16 +502,16 @@ const
   LUAL_NUMSIZES = (sizeof(lua_Integer)*16 + sizeof(lua_Number))
 
 ### IMPORT FROM "luaL_$1"
-proc checkversion*(L: PState; ver: lua_Number; sz: csize) {.importc: "luaL_checkversion_".}
+proc checkversion*(L: PState; ver: lua_Number; sz: csize_t) {.importc: "luaL_checkversion_".}
 proc checkversion*(L: PState) {.inline.} = L.checkversion(LUA_VERSION_NUM, LUAL_NUMSIZES)
 
 proc getmetafield*(L: PState; obj: cint; e: cstring): cint {.iluaL.}
 proc callmeta*(L: PState; obj: cint; e: cstring): cint {.iluaL.}
-#proc tolstring*(L: PState; idx: cint; len: ptr csize): cstring {.importc: "luaL_tolstring".}
+#proc tolstring*(L: PState; idx: cint; len: ptr csize_t): cstring {.importc: "luaL_tolstring".}
 # ^ duplicate?
 proc argerror*(L: PState; numarg: cint; extramsg: cstring): cint {.iluaL.}
-proc checklstring*(L: PState; arg: cint; len: ptr csize): cstring {.iluaL.}
-proc optlstring*(L: PState; arg: cint; def: cstring; len: ptr csize): cstring {.iluaL.}
+proc checklstring*(L: PState; arg: cint; len: ptr csize_t): cstring {.iluaL.}
+proc optlstring*(L: PState; arg: cint; def: cstring; len: ptr csize_t): cstring {.iluaL.}
 proc checknumber*(L: PState; arg: cint): lua_Number {.iluaL.}
 proc optnumber*(L: PState; arg: cint; def: lua_Number): lua_Number {.iluaL.}
 proc checkinteger*(L: PState; arg: cint): lua_Integer {.iluaL.}
@@ -535,7 +538,7 @@ proc unref*(L: PState; t: cint; iref: cint) {.iluaL.}
 proc loadfilex*(L: PState; filename: cstring; mode: cstring): cint {.iluaL.}
 proc loadfile*(L: PState; filename: cstring): cint = L.loadfilex(filename, nil)
 
-proc loadbufferx*(L: PState; buff: cstring; sz: csize; name, mode: cstring): cint {.iluaL.}
+proc loadbufferx*(L: PState; buff: cstring; sz: csize_t; name, mode: cstring): cint {.iluaL.}
 proc loadstring*(L: PState; s: cstring): cint {.iluaL.}
 proc newstate*(): PState {.iluaL.}
 proc llen*(L: PState; idx: cint): cint {.iluaL, importc:"luaL_len".}
@@ -584,7 +587,7 @@ template opt*(L: PState, f: TCFunction, n, d: typed) =
   if L.isnoneornil(n): d else: L.f(n)
 
 proc loadbuffer*(L: PState, buff: string, name: string): cint =
-  L.loadbufferx(buff, buff.len, name, nil)
+  L.loadbufferx(buff, buff.len.csize_t, name, nil)
 
 #
 #@@ TBufferSIZE is the buffer size used by the lauxlib buffer system.
@@ -602,26 +605,26 @@ type
   PBuffer* = ptr TBuffer
   TBuffer* {.pure, final.} = object
     b*: cstring             # buffer address
-    size*: csize           # buffer size
-    n*: csize              # number of characters in buffer
+    size*: csize_t           # buffer size
+    n*: csize_t              # number of characters in buffer
     L*: PState
     initb*: array[Lua_BufferSIZE, char] # initial buffer
 
 proc buffinit*(L: PState; B: PBuffer) {.iluaL.}
-proc prepbuffsize*(B: PBuffer; sz: csize): cstring {.iluaL.}
-proc addlstring*(B: PBuffer; s: cstring; len: csize) {.iluaL.}
+proc prepbuffsize*(B: PBuffer; sz: csize_t): cstring {.iluaL.}
+proc addlstring*(B: PBuffer; s: cstring; len: csize_t) {.iluaL.}
 proc addstring*(B: PBuffer; s: cstring) {.iluaL.}
 proc addvalue*(B: PBuffer) {.iluaL.}
 proc pushresult*(B: PBuffer) {.iluaL.}
-proc pushresultsize*(B: PBuffer; sz: csize) {.iluaL.}
-proc buffinitsize*(L: PState; B: PBuffer; sz: csize): cstring {.iluaL.}
+proc pushresultsize*(B: PBuffer; sz: csize_t) {.iluaL.}
+proc buffinitsize*(L: PState; B: PBuffer; sz: csize_t): cstring {.iluaL.}
 proc addchar*(B: PBuffer, c: char) =
   if B.n < B.size: discard B.prepbuffsize(1)
   B.b[B.n] = c
   inc B.n
 
 proc addsize*(B: PBuffer, s: int) {.inline.} = inc(B.n, s)
-proc prepbuffer*(B: PBuffer): cstring {.inline.} = prepbuffsize(B, Lua_BufferSIZE)
+proc prepbuffer*(B: PBuffer): cstring {.inline.} = prepbuffsize(B, Lua_BufferSIZE.csize_t)
 
 # }======================================================
 #

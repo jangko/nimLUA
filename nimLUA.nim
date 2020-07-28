@@ -109,6 +109,12 @@ const
 template luaError*(x: PState, m: string): untyped =
   lua.error(x, m)
 
+template newuserdata*(L: PState, sz: int): pointer =
+  newuserdata(L, sz.csize_t)
+
+template pushlstring*(L: PState, s: cstring, len: int): cstring =
+  pushlstring(L, s, len.csize_t)
+
 proc isStrictString*(L: PState, idx: int): bool {.inline.} =
   luaType(L, idx.cint) == LUA_TSTRING.cint
 
@@ -784,7 +790,7 @@ proc newNimLua*(readOnlyEnum = false): PState =
   L.NLSetErrorHandler(stdNimLuaErrFunc)
   L.NLSetErrorContext(nil)
 
-  let roEnum = """
+  const roEnum = """
 function readonlytable(table)
   return setmetatable({}, {
     __index = table,
@@ -793,13 +799,13 @@ function readonlytable(table)
   });
 end
 """
-  let rwEnum = """
+  const rwEnum = """
 function readonlytable(table)
   return table
 end
 """
 
-  let metaMethods = """
+  const metaMethods = """
 function __nlbIndex(myobject, key)
   local mytable = getmetatable(myobject)
   local x = rawget(mytable, "_get_" .. key)
@@ -820,8 +826,13 @@ function __nlbNewIndex(myobject, key, value)
 end
 """
 
+  const
+    nimVer = "Nim = { major = $1, minor = $2, patch = $3 }" %
+    [$NimMajor, $NimMinor, $NimPatch]
+
   discard L.doString(if readOnlyEnum: roEnum else: rwEnum)
   discard L.doString(metaMethods)
+  discard L.doString(nimVer)
   result = L
 
 proc propsEnd*(L: PState) =

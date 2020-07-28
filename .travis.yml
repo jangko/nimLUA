@@ -26,9 +26,9 @@ matrix:
 install:
   - "wget -q $LUA_URL"
   - "tar xfz $LUA_ARC"
-  - "mv $LUA_SO ./test/"
-  - "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/test/"
-  - "export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:$(pwd)/test/"
+  - "mv $LUA_SO ./tests/"
+  - "export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$(pwd)/tests/"
+  - "export DYLD_LIBRARY_PATH=$DYLD_LIBRARY_PATH:$(pwd)/tests/"
 
   # build nim from our own branch - this to avoid the day-to-day churn and
   # regressions of the fast-paced Nim development while maintaining the
@@ -51,11 +51,7 @@ install:
 
 script:
   #- nimble install -y > /dev/null
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then nimble test; fi
+  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then nimble tests; fi
   # OSX DYLD_LIBRARY_PATH not available in subprocess env
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then nim c -d:nimDebugDlOpen test/test; fi
-  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then test/test; fi
-  # OSX release build still failed when bind object
-  #- if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then nim c -d:nimDebugDlOpen -d:release test/test; fi
-  #- if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then test/test; fi
-
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then nim c -d:nimDebugDlOpen tests/test_features; fi
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then tests/test_features; fi

@@ -69,7 +69,7 @@ no need to remember complicated API, the API is simple but powerful
 ### **1. bindEnum**
 
 ```nimrod
-import nimLua, os
+import nimLUA, os
 
 type
   FRUIT = enum
@@ -152,7 +152,7 @@ assert(NEUTRON == 2)
 ### **2. bindConst**
 
 ```nimrod
-import nimLua
+import nimLUA
 
 const
   MANGOES = 10.0
@@ -191,7 +191,7 @@ operator `->` have same meaning with bindEnum, to rename exported symbol on Lua 
 bindFunction is an alias to bindProc, they behave identically
 
 ```nimrod
-import nimLua
+import nimLUA
 
 proc abc(a, b: int): int =
   result = a + b
@@ -212,7 +212,7 @@ operator `->` have same meaning with bindEnum, to rename exported symbol on Lua 
 ### **4. bindObject**
 
 ```nimrod
-import nimLua
+import nimLUA
 
 type
   Foo = ref object
@@ -473,3 +473,11 @@ still under development, contributions are welcome
 
 ## Installation via nimble
 > nimble install nimLUA
+
+## Override shared library name
+
+You can use compiler switch `-d:SHARED_LIB_NAME="yourlibname"`
+
+```bash
+$> nim c -r -d:SHARED_LIB_NAME="lua534.dll" test/test
+```
