@@ -575,10 +575,14 @@ proc Ltypename*(L: PState, i: cint): cstring {.inline.} =
   L.typename(L.luatype(i))
 
 proc dofile*(L: PState, file: string): cint {.inline, discardable.} =
-  result = L.loadfile(file) or L.pcall(0, LUA_MULTRET, 0)
+  result = L.loadfile(file)
+  if result == LUA_OK:
+    result = L.pcall(0, LUA_MULTRET, 0)
 
 proc dostring*(L: PState, s: string): cint {.inline, discardable.} =
-  result = L.loadstring(s) or L.pcall(0, LUA_MULTRET, 0)
+  result = L.loadstring(s)
+  if result == LUA_OK:
+    result = L.pcall(0, LUA_MULTRET, 0)
 
 proc getmetatable*(L: PState, s: string) {.inline.} =
   L.getfield(LUA_REGISTRYINDEX, s)

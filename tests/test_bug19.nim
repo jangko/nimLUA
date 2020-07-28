@@ -31,4 +31,9 @@ assert(foo:addv("apple","banana") == "hello: my name is , here is my message: ap
 """
   check L.doString(luaScript) == 0.cint
 
+test "bug23":
+  let r = L.doString("a = 7 + 11aa")
+  check r != LUA_OK
+  check L.toString(-1) == """[string "a = 7 + 11aa"]:1: malformed number near '11aa'"""
+
 L.close()
