@@ -25,6 +25,9 @@ elif not defined(useLuaJIT):
   when defined(MACOSX):
     const
       LIB_NAME* = "liblua53.dylib"
+  elif defined(FREEBSD):
+    const
+      LIB_NAME* = "liblua-5.3.so"
   elif defined(UNIX):
     const
       LIB_NAME* = "liblua53.so"
@@ -35,6 +38,9 @@ else:
   when defined(MACOSX):
     const
       LIB_NAME* = "libluajit.dylib"
+  elif defined(FREEBSD):
+    const
+      LIB_NAME* = "libluajit-5.1.so"
   elif defined(UNIX):
     const
       LIB_NAME* = "libluajit.so"
