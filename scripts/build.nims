@@ -17,6 +17,8 @@ else:
 
 when defined(MACOSX):
   const LIB_NAME* = "liblua5.3.dylib"
+elif defined(FREEBSD):
+  const LIB_NAME* = "liblua-5.3.so"
 elif defined(UNIX):
   const LIB_NAME* = "liblua5.3.so"
 else:
