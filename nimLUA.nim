@@ -2035,7 +2035,9 @@ proc getRegisteredUD*[T](L: PState, proxy: T): ptr T =
   # this help us to communicate with lua side from Nim
   if proxy.ud == nil: return nil
 
-  assert(cast[int](proxy.ud) > NLMaxID)
+  # proxy.ud must be larger than NLMaxID
+  doAssert((cast[int](proxy.ud) and (not NLMaxID)) != 0)
+
   L.pushLightUserData(cast[pointer](proxy.ud))
   L.rawGet(LUA_REGISTRYINDEX)
   if not L.isNil(-1): # name already in use?

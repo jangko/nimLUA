@@ -136,10 +136,15 @@ type
   lua_Number* = float64  # type of numbers in Lua
   lua_Integer* = int64    # ptrdiff_t \ type for integer functions
 
-{.push callconv: cdecl, dynlib: LIB_NAME .} # importc: "lua_$1"  was not allowed?
-{.pragma: ilua, importc: "lua_$1".} # lua.h
-{.pragma: iluaLIB, importc: "lua$1".} # lualib.h
-{.pragma: iluaL, importc: "luaL_$1".} # lauxlib.h
+when defined(lua_static_lib):
+  {.pragma: ilua, cdecl, importc: "lua_$1".} # lua.h
+  {.pragma: iluaLIB, cdecl, importc: "lua$1".} # lualib.h
+  {.pragma: iluaL, cdecl, importc: "luaL_$1".} # lauxlib.h
+else:
+  {.push callconv: cdecl, dynlib: LIB_NAME .} # importc: "lua_$1"  was not allowed?
+  {.pragma: ilua, importc: "lua_$1".} # lua.h
+  {.pragma: iluaLIB, importc: "lua$1".} # lualib.h
+  {.pragma: iluaL, importc: "luaL_$1".} # lauxlib.h
 
 proc newstate*(f: TAlloc; ud: pointer): PState {.ilua.}
 proc close*(L: PState) {.ilua.}
@@ -173,7 +178,10 @@ proc isstring*(L: PState; idx: cint): cint {.ilua.}
 proc iscfunction*(L: PState; idx: cint): cint {.ilua.}
 proc isuserdata*(L: PState; idx: cint): cint {.ilua.}
 proc isinteger*(L: PState; idx: cint): cint {.ilua.}
-proc luatype*(L: PState; idx: cint): cint {.importc: "lua_type".}
+when defined(lua_static_lib):
+  proc luatype*(L: PState; idx: cint): cint {.cdecl, importc: "lua_type".}
+else:
+  proc luatype*(L: PState; idx: cint): cint {.importc: "lua_type".}
 proc typename*(L: PState; tp: cint): cstring {.ilua.}
 proc tonumberx*(L: PState; idx: cint; isnum: ptr cint): lua_Number {.ilua.}
 proc tointegerx*(L: PState; idx: cint; isnum: ptr cint): lua_Integer {.ilua.}

@@ -1,4 +1,4 @@
-import ospaths, strutils
+import os, strutils
 
 when defined(unix):
   const
@@ -28,6 +28,7 @@ type
   FileName = tuple[dir, name, ext: string]
 
 proc getCFiles(dir: string): seq[FileName] =
+  debugEcho dir
   var files = listFiles(dir)
   result = @[]
   for c in files:
@@ -43,11 +44,11 @@ proc toString(names: seq[string]): string =
     result.add c
     result.add " "
 
-let src = getCFiles("lua" & DirSep & "src")
+let src = getCFiles("external" / "lua" / "src")
 var objs: seq[string] = @[]
 
 for x in src:
-  let fileName = x.dir & $DirSep & x.name
+  let fileName = x.dir / x.name
   let buildCmd = "gcc -O2 -Wall $1 $2 -c -o $3.o $3.c $4" % [extraFlag, compatFlag, fileName, linkFlags]
   try:
     exec(buildCmd)
@@ -57,6 +58,6 @@ for x in src:
     echo "failed to build ", fileName
 
 let objList = toString(objs)
-let linkCmd = "gcc -shared $4 -o $1$2$3 $5" % ["tests", $DirSep, LIB_NAME, extraFlag, objList]
+let linkCmd = "gcc -shared $4 -o $1$2$3 $5" % [".", $DirSep, LIB_NAME, extraFlag, objList]
 echo linkCmd
 exec(linkCmd)
