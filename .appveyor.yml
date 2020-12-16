@@ -81,14 +81,14 @@ install:
   - appveyor DownloadFile "https://www.lua.org/ftp/lua-5.3.5.tar.gz"
   - 7z e lua-5.3.5.tar.gz
   - 7z x lua-5.3.5.tar
-  - ren lua-5.3.5 lua
+  - mkdir external
+  - move lua-5.3.5 external\lua
 
 build_script:
   - cd C:\projects\%APPVEYOR_PROJECT_SLUG%
-  #- nimble install -y > nul
 
 test_script:
-  - nim e scripts/build.nims
-  - nimble tests
+  - nim e scripts/build_static_lib.nims
+  - nimble test
 
 deploy: off

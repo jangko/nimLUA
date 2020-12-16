@@ -15,10 +15,9 @@ local f = Fish.new(15)
 assert(f:grill() == "grill 15")
 assert(f:fry() == "fry 15")
 
-print(gem.mining())
-print(gem.polish())
-print("ANODE " .. gem.ANODE)
-
+assert(gem.mining() == "mining gem")
+assert(gem.polish() == "polishing gem")
+assert(gem.ANODE == 11)
 
 local k = kakap.new(16)
 assert(k:grill() == "grill 16")

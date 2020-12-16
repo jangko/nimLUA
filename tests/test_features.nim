@@ -1,4 +1,4 @@
-import nimLUA, os, strutils
+import ../nimLUA, os, strutils, unittest
 
 type
   GENE {.pure.} = enum
@@ -60,13 +60,16 @@ proc rootv(u: float): seq[float] =
   result = newSeq[float](10)
   for i in 0..9: result[i] = u * i.float
 
-proc test(L: PState, fileName: string) =
-  if L.doFile("tests" / fileName) != 0.cint:
+proc testIMPL(L: PState, fileName: string): bool =
+  if L.doFile("tests" / "luas" / fileName) != 0.cint:
     echo L.toString(-1)
     L.pop(1)
-    quit(-1)
-  else:
-    echo fileName & " .. OK"
+    return
+  result = true
+
+template test(L: PState, fileName: string) =
+  test fileName:
+    check testIMPL(L, fileName) == true
 
 proc `++`(a, b: int): int = a + b
 
@@ -240,7 +243,7 @@ proc trangC(a, b: int): range[5..50] =
   result = a + b + 5
 
 proc mew[T, K](a: T, b: K): T =
-  echo a, " ", b
+  # echo a, " ", b
   result = a
 
 proc opa(arg: openArray[int]): int =
@@ -382,224 +385,225 @@ proc testFromLua(L: PState) =
   L.pop(1) # pop View Table]#
 
 proc main() =
-  var L = newNimLua()
+  suite "nimLUA test suite":
+    var L = newNimLua()
 
-  L.bindConst:
-    MANGOES
-    PAPAYA
-    LEMON
-    MAX_DASH_PATTERN
-    CATHODE
-    ANODE
+    L.bindConst:
+      MANGOES
+      PAPAYA
+      LEMON
+      MAX_DASH_PATTERN
+      CATHODE
+      ANODE
 
-  L.bindConst("mmm"):
-    ELECTRON16
-    PROTON16
-    ELECTRON32
-    PROTON32
-    ELECTRON64
-    PROTON64
-    connected
+    L.bindConst("mmm"):
+      ELECTRON16
+      PROTON16
+      ELECTRON32
+      PROTON32
+      ELECTRON64
+      PROTON64
+      connected
 
-  L.bindConst("ccc"):
-    LABEL_STYLE_CH
-    INFO_FIELD
-    STAIR
-    HELIX
-    GREET
-    mime
-    programme
+    L.bindConst("ccc"):
+      LABEL_STYLE_CH
+      INFO_FIELD
+      STAIR
+      HELIX
+      GREET
+      mime
+      programme
 
-  L.bindConst:
-    MANGOES -> "MANGGA"
-    PAPAYA -> "PEPAYA"
-    LEMON -> "JERUK"
+    L.bindConst:
+      MANGOES -> "MANGGA"
+      PAPAYA -> "PEPAYA"
+      LEMON -> "JERUK"
 
-  L.bindConst("buah"):
-    MANGOES -> "MANGGA"
-    PAPAYA -> "PEPAYA"
-    LEMON -> "JERUK"
-  L.test("constants.lua")
+    L.bindConst("buah"):
+      MANGOES -> "MANGGA"
+      PAPAYA -> "PEPAYA"
+      LEMON -> "JERUK"
+    L.test("constants.lua")
 
-  L.bindEnum(GENE)
-  L.test("single_scoped_enum.lua")
+    L.bindEnum(GENE)
+    L.test("single_scoped_enum.lua")
 
-  L.bindEnum(GENE -> "DNA", ATOM -> GLOBAL, FRUIT)
-  L.test("scoped_and_global_enum.lua")
+    L.bindEnum(GENE -> "DNA", ATOM -> GLOBAL, FRUIT)
+    L.test("scoped_and_global_enum.lua")
 
-  L.bindEnum:
-    ATOM
-    GENE
-    FRUIT
-    `poncho`
-  L.test("scoped_enum.lua")
+    L.bindEnum:
+      ATOM
+      GENE
+      FRUIT
+      `poncho`
+    L.test("scoped_enum.lua")
 
-  L.bindFunction(mulv, tpc, tpm -> "goodMan")
-  L.test("free_function.lua")
+    L.bindFunction(mulv, tpc, tpm -> "goodMan")
+    L.test("free_function.lua")
 
-  L.bindFunction("gum"):
-    mulv
-    tpc
-    tpm -> "goodMan"
-    `++`
-  L.test("scoped_function.lua")
+    L.bindFunction("gum"):
+      mulv
+      tpc
+      tpm -> "goodMan"
+      `++`
+    L.test("scoped_function.lua")
 
-  L.bindObject(Foo):
-    newFoo -> constructor
-    addv
-    addk -> "add"
-    setAcid2
-    setAcid
-    newFoo
-    newFoo -> "whatever"
-  L.test("fun.lua")
+    L.bindObject(Foo):
+      newFoo -> constructor
+      addv
+      addk -> "add"
+      setAcid2
+      setAcid
+      newFoo
+      newFoo -> "whatever"
+    L.test("fun.lua")
 
-  L.bindFunction("mac"):
-    machine
-  L.test("ov_func.lua")
+    L.bindFunction("mac"):
+      machine
+    L.test("ov_func.lua")
 
-  L.bindObject(Acid):
-    makeAcid -> constructor
-    setLen
-    getLen
+    L.bindObject(Acid):
+      makeAcid -> constructor
+      setLen
+      getLen
 
-  L.bindFunction("acd"):
-    makeAcid
+    L.bindFunction("acd"):
+      makeAcid
 
-  L.bindFunction(makeAcid)
-  L.bindObject(Fish):
-    fishing -> constructor
+    L.bindFunction(makeAcid)
+    L.bindObject(Fish):
+      fishing -> constructor
 
-  L.bindObject(Fish):
-    grill
-    fry
+    L.bindObject(Fish):
+      grill
+      fry
 
-  L.bindFunction("gem", mining)
-  L.bindFunction("gem", polish)
-  L.bindConst("gem", ANODE)
+    L.bindFunction("gem", mining)
+    L.bindFunction("gem", polish)
+    L.bindConst("gem", ANODE)
 
-  L.bindObject(Fish -> "kakap"):
-    grill
-    fry
-  L.test("regular_object.lua")
+    L.bindObject(Fish -> "kakap"):
+      grill
+      fry
+    L.test("regular_object.lua")
 
-  L.bindFunction(GLOBAL):
-    mulv
+    L.bindFunction(GLOBAL):
+      mulv
 
-  L.bindFunction("GLOBAL", mulv, subb)
+    L.bindFunction("GLOBAL", mulv, subb)
 
-  L.bindConst(GLOBAL):
-    LEMON
+    L.bindConst(GLOBAL):
+      LEMON
 
-  L.bindConst("GLOBAL"):
-    LEMON
+    L.bindConst("GLOBAL"):
+      LEMON
 
-  L.bindEnum:
-    GENE -> GLOBAL
-    FRUIT -> "GLOBAL"
-  L.test("namespace.lua")
+    L.bindEnum:
+      GENE -> GLOBAL
+      FRUIT -> "GLOBAL"
+    L.test("namespace.lua")
 
-  L.bindFunction("arr"):
-    chemA
-    geneA
-    fruitA
-    geneB
-    geneC
-    fruitC
-    chemC
-  L.test("array_param_ret.lua")
+    L.bindFunction("arr"):
+      chemA
+      geneA
+      fruitA
+      geneB
+      geneC
+      fruitC
+      chemC
+    L.test("array_param_ret.lua")
 
-  L.bindFunction("proto_banana"):
-    fruitE -> "radiate"
-  L.test("enum_param_ret.lua")
+    L.bindFunction("proto_banana"):
+      fruitE -> "radiate"
+    L.test("enum_param_ret.lua")
 
-  L.bindFunction("set"):
-    fruitS
-    alphaS
-    fruitSA
-    alphaSA
-  L.test("set_param_ret.lua")
+    L.bindFunction("set"):
+      fruitS
+      alphaS
+      fruitSA
+      alphaSA
+    L.test("set_param_ret.lua")
 
-  L.bindFunction("seq"):
-    fruitQ
-    fruitQA
-    geneQ
-    geneQA
-    stringQ
-    stringQA
-    rootv
-  L.test("sequence_param_ret.lua")
+    L.bindFunction("seq"):
+      fruitQ
+      fruitQA
+      geneQ
+      geneQA
+      stringQ
+      stringQA
+      rootv
+    L.test("sequence_param_ret.lua")
 
-  L.bindFunction("ptr"):
-    seedP
-    geneP
-    genePA
-    intP
-    intPA
-    genePPA
-    intPPA
-    genePPB
-    intPPB
-  L.test("ptr_pointer.lua")
+    L.bindFunction("ptr"):
+      seedP
+      geneP
+      genePA
+      intP
+      intPA
+      genePPA
+      intPPA
+      genePPB
+      intPPB
+    L.test("ptr_pointer.lua")
 
-  L.bindFunction("range"):
-    trangA
-    trangB
-    trangC -> "haha"
-    trangC
-  L.test("range_param_ret.lua")
+    L.bindFunction("range"):
+      trangA
+      trangB
+      trangC -> "haha"
+      trangC
+    L.test("range_param_ret.lua")
 
-  var test = 1237
-  proc cl(): string =
-    echo test
-    result = $test
+    var test = 1237
+    proc cl(): string =
+      # echo test
+      result = $test
 
-  L.bindFunction("wow"):
-    [cl]
-    [cl] -> "clever"
-    mew[int, int]
-    mew[int, string] -> "mewt"
-    opa
+    L.bindFunction("wow"):
+      [cl]
+      [cl] -> "clever"
+      mew[int, int]
+      mew[int, string] -> "mewt"
+      opa
 
-  L.test("generic.lua")
-  L.test("closure.lua")
-  L.test("openarray.lua")
+    L.test("generic.lua")
+    L.test("closure.lua")
+    L.test("openarray.lua")
 
-  L.bindObject(Foos):
-    newFoos
-    getName
-    name(get,set)
+    L.bindObject(Foos):
+      newFoos
+      getName
+      name(get,set)
 
-  L.bindObject(Ship):
-    newShip
-    speed(set)
-    speed(get, set) -> "cepat"
-    engine(set)
-    power(get)
-  L.test("getter_setter.lua")
+    L.bindObject(Ship):
+      newShip
+      speed(set)
+      speed(get, set) -> "cepat"
+      engine(set)
+      power(get)
+    L.test("getter_setter.lua")
 
-  L.bindFunction("tup"):
-    dino
-    saurus
-    croco
-    dile
-  L.test("tuple.lua")
+    L.bindFunction("tup"):
+      dino
+      saurus
+      croco
+      dile
+    L.test("tuple.lua")
 
-  L.bindObject(Avocado):
-    newAvocado -> "new"
-    name(get)
-    id(get)
-    getId
+    L.bindObject(Avocado):
+      newAvocado -> "new"
+      name(get)
+      id(get)
+      getId
 
-  L.bindObject(Pineapple):
-    initPineapple -> "init"
-    name(get)
-    id(get)
-    getId
-    getAvocado
-  L.test("inheritance.lua")
+    L.bindObject(Pineapple):
+      initPineapple -> "init"
+      name(get)
+      id(get)
+      getId
+      getAvocado
+    L.test("inheritance.lua")
 
-  L.testFromLua()
-  L.close()
+    L.testFromLua()
+    L.close()
 
 main()

@@ -5,6 +5,7 @@ glue code generator to bind Nim and Lua together using Nim's powerful macro
 [![Windows build status (Appveyor)](https://img.shields.io/appveyor/ci/jangko/nimLUA/master.svg?label=Windows "Windows build status (Appveyor)")](https://ci.appveyor.com/project/jangko/nimLUA)
 ![nimble](https://img.shields.io/badge/available%20on-nimble-yellow.svg?style=flat-square)
 ![license](https://img.shields.io/github/license/citycide/cascade.svg?style=flat-square)
+![Github action](https://github.com/jangko/nimLUA/workflows/nimLUA%20CI/badge.svg)
 - - -
 
 **Features**:

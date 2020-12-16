@@ -5,3 +5,4 @@ bug/
 *.dll
 lua/
 master/
+external/

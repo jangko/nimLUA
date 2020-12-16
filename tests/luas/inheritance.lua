@@ -16,7 +16,6 @@ assert(av3 == nil)
 
 local foo = Foos.newFoos("seamonkey")
 local av4 = Avocado.new(foo)
-print(av4.name)
 assert(av4.name == "seamonkey") -- good, it works
 
 local av5 = pn:getAvocado(0)
