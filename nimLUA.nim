@@ -2335,3 +2335,51 @@ macro instantiateRegisteredProxy(obj: typed): untyped =
 
 proc getUD*[T: ref](L: PState, objRef: T): T =
   instantiateRegisteredProxy(T)
+
+# -----------------------------------------------------------------------
+# ------------------------------ importLua ------------------------------
+# -----------------------------------------------------------------------
+
+# TODO: call method on lua object
+# TODO: call with lua values
+# TODO: tests
+
+macro importLua(usage: string, toImport: typed): untyped =
+  # usage has the same rules as importCpp
+  # except for the operator usage
+  #
+  # as function
+  # name(@)
+  # table.table.table.name(@)
+  #
+  # as method
+  # #:name(@)
+  #
+ 
+  # Check proc def if it is legal
+  #  Reject generics
+  if toImport[2].kind != nnkEmpty:
+    error("Lua-imported function is generic; Lua has no generics", toImport[2])
+
+  #  Reject all unknown pragmas
+  if toImport[4].kind != nnkEmpty:
+    error("Lua-imported function has unknown pragma; this cannot be applied to it", toImport[4])
+
+  #  Reject if proc has body
+  #  * importc does not do this...
+  if false: # toImport[6].kind != nnkEmpty:
+    error("Lua-imported function has body; use bindFunction instead", toImport[2])
+
+
+  # Parse usage
+  if false:
+    discard
+  else:
+    error("Unknown usage syntax")
+
+  # Generate code from usage and proc def
+  discard
+
+  # how to use this macro?
+  # proc name(a: int): tuple[a: string, b: int] {.importLua: "".} 
+
