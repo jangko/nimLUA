@@ -5,7 +5,7 @@ description   = "glue code generator to bind Nim and Lua together using Nim's po
 license       = "MIT"
 skipDirs      = @["test", "scripts"]
 
-requires: "nim >= 1.2.2"
+requires: "nim >= 1.6.16"
 
 ### Helper functions
 proc test(env, path: string) =
