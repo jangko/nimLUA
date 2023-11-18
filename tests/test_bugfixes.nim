@@ -1,7 +1,7 @@
 when defined(importLogging):
   import ../nimLUA, os, sequtils, logging, unittest
 else:
-  import ../nimLUA, os, sequtils, json, random, unittest
+  import ../nimLUA, unittest
 
 type
   Foo = ref object

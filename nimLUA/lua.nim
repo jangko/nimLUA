@@ -402,8 +402,8 @@ type
     currentline*: cint    # (l)
     linedefined*: cint    # (S)
     lastlinedefined*: cint # (S)
-    nups*: cuchar         # (u) number of upvalues
-    nparams*: cuchar      # (u) number of parameters
+    nups*: char           # (u) number of upvalues
+    nparams*: char        # (u) number of parameters
     isvararg*: char       # (u)
     istailcall*: char     # (t)
     short_src*: array[LUA_IDSIZE, char] # (S) \ # private part
