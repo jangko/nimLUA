@@ -1,7 +1,7 @@
 # nimLUA
 # glue code generator to bind Nim and Lua together using Nim's powerful macro
 #
-# Copyright (c) 2015 Andri Lim
+# Copyright (c) 2015-2023 Andri Lim
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal

@@ -7,38 +7,19 @@ jobs:
       fail-fast: false
       max-parallel: 20
       matrix:
+        test_lang: [c, cpp]
         branch: [master]
         target:
           - os: linux
             cpu: amd64
-            TEST_LANG: c
-          - os: linux
-            cpu: amd64
-            TEST_LANG: cpp
           - os: linux
             cpu: i386
-            TEST_LANG: c
-          - os: linux
-            cpu: i386
-            TEST_LANG: cpp
           - os: macos
             cpu: amd64
-            TEST_LANG: c
-          - os: macos
-            cpu: amd64
-            TEST_LANG: cpp
           - os: windows
             cpu: amd64
-            TEST_LANG: c
-          - os: windows
-            cpu: amd64
-            TEST_LANG: cpp
           - os: windows
             cpu: i386
-            TEST_LANG: c
-          - os: windows
-            cpu: i386
-            TEST_LANG: cpp
         include:
           - target:
               os: linux
@@ -53,8 +34,8 @@ jobs:
     defaults:
       run:
         shell: bash
-        
-    name: '${{ matrix.target.os }}-${{ matrix.target.cpu }}-${{ matrix.target.TEST_LANG }} (${{ matrix.branch }})'
+
+    name: '${{ matrix.target.os }}-${{ matrix.target.cpu }}-${{ matrix.test_lang }} (${{ matrix.branch }})'
     runs-on: ${{ matrix.builder }}
     steps:
       - name: Checkout nimLUA
@@ -152,7 +133,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: nim
-          key: 'nim-${{ matrix.target.os }}-${{ matrix.target.cpu }}-${{ steps.versions.outputs.nim }}'
+          key: '${{ matrix.test_lang }}-${{ matrix.target.os }}-${{ matrix.target.cpu }}-${{ steps.versions.outputs.nim }}'
 
       - name: Restore prebuilt csources from cache
         if: steps.nim-cache.outputs.cache-hit != 'true'
@@ -236,4 +217,4 @@ jobs:
       - name: Run nimLUA tests
         run: |
           cd nimLUA
-          env TEST_LANG="${{ matrix.target.TEST_LANG }}" nimble test
+          env TEST_LANG="${{ matrix.test_lang }}" nimble test
