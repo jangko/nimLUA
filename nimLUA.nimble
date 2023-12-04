@@ -28,9 +28,11 @@ proc test(env, path: string) =
 
   if not dirExists "build":
     mkDir "build"
-  exec "nim " & lang & " " & env &
+  let cmd = "nim " & lang & " " & env &
     " --outdir:build -r --hints:off --warnings:off " &
     " -d:lua_static_lib --passL:\"-Lexternal -llua " & libm & " \" " & path
+  echo cmd
+  exec cmd
 
 task test, "Run all tests":
   test "-d:nimDebugDlOpen", "tests/test_features"

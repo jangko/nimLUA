@@ -44,7 +44,7 @@ proc toString(names: seq[string]): string =
     result.add c
     result.add " "
 
-let src = getCFiles("external" / "lua" / "src")
+let src = getCFiles("lua" / "src")
 var objs: seq[string] = @[]
 
 for x in src:

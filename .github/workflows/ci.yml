@@ -228,7 +228,7 @@ jobs:
           mkdir -p "$EXTPATH"
           curl -L https://www.lua.org/ftp/lua-5.3.5.tar.gz -o "$EXTPATH/lua_source.tar.gz"
           tar xfz "$EXTPATH/lua_source.tar.gz" -C "$EXTPATH"
-          mv "$EXTPATH/lua-5.3.5" "$EXTPATH/lua"
+          mv "$EXTPATH/lua-5.3.5" lua
           cd nimLUA
           nim e scripts/build_static_lib.nims
           cd ..
